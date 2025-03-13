@@ -12,12 +12,27 @@ services:
       SIGNUPS_ALLOWED: false
     volumes:
       - '/mnt/oraclevdb/vaultwarden/:/data/'
+    networks:
+      - vaultwarden-proxy
+
+  robots-txt:
+    container_name: robots-txt
+    image: busybox
+    restart: unless-stopped
+    command: httpd -f -p 8001
+    configs:
+      - robots.txt
+      - source: httpd-conf
+        target: /etc/httpd.conf
+    networks:
+      - robots-txt-proxy
 
   cloudflared:
     container_name: cloudflared
     image: 'cloudflare/cloudflared:latest'
     depends_on:
       - vaultwarden
+      - robots-txt
     restart: unless-stopped
     volumes:
       - '/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/'
@@ -28,6 +43,9 @@ services:
     secrets:
       - source: cloudflared-credentials-file
         target: ${cloudflared_tunnel_id}.json
+    networks:
+      - vaultwarden-proxy
+      - robots-txt-proxy
 
   foldingathome:
     container_name: foldingathome
@@ -44,7 +62,19 @@ services:
       - source: fah-config
         target: /app/config.xml
 
+networks:
+  vaultwarden-proxy:
+  robots-txt-proxy:
+
 configs:
+  httpd-conf:
+    content: |
+      # https://github.com/mirror/busybox/blob/master/networking/httpd.c
+      I:robots.txt
+  robots.txt:
+    content: |
+      User-agent: *
+      Disallow: /
   cloudflared-config:
     content: |
       tunnel: ${cloudflared_tunnel_id}
@@ -58,10 +88,12 @@ configs:
       region: us
 
       ingress:
+        - hostname: vault.jeremyserver.me/robots.txt
+          service: http://robots-txt:8001
         - hostname: vault.jeremyserver.me
           service: http://vaultwarden:80
-        - hostname: test.jeremyserver.me
-          service: hello_world
+        - hostname: jeremyserver.me/robots.txt
+          service: http://robots-txt:8001
         - service: http_status:404
   fah-config:
     content: |
