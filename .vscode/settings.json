@@ -1,0 +1,9 @@
+{
+  "editor.defaultFormatter": "hashicorp.terraform",
+  "[terraform][terraform-vars]": {
+    "editor.defaultFormatter": "hashicorp.terraform"
+  },
+  "terraform.experimentalFeatures.validateOnSave": true,
+  "terraform.experimentalFeatures.prefillRequiredFields": true,
+  "terraform.codelens.referenceCount": true
+}

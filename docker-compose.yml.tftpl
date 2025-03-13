@@ -1,0 +1,90 @@
+name: jeremyserver
+
+services:
+  vaultwarden:
+    container_name: vaultwarden
+    image: 'vaultwarden/server:latest'
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql://${mysql_admin_username}:${mysql_admin_password}@${mysql_host}:${mysql_port}/vaultwarden
+      DOMAIN: 'https://vault.jeremyserver.me'
+      TRASH_AUTO_DELETE_DAYS: 90
+      SIGNUPS_ALLOWED: false
+    volumes:
+      - '/mnt/oraclevdb/vaultwarden/:/data/'
+
+  cloudflared:
+    container_name: cloudflared
+    image: 'cloudflare/cloudflared:latest'
+    depends_on:
+      - vaultwarden
+    restart: unless-stopped
+    volumes:
+      - '/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/'
+    command: tunnel run
+    configs:
+      - source: cloudflared-config
+        target: /etc/cloudflared/config.yml
+    secrets:
+      - source: cloudflared-credentials-file
+        target: ${cloudflared_tunnel_id}.json
+
+  foldingathome:
+    container_name: foldingathome
+    image: lscr.io/linuxserver/foldingathome:latest
+    restart: unless-stopped
+    environment:
+      - PUID=1001
+      - PGID=1001
+      - TZ=America/Los_Angeles
+      - CLI_ARGS=--config /app/config.xml
+    volumes:
+      - /mnt/oraclevdb/foldingathome:/config/
+    configs:
+      - source: fah-config
+        target: /app/config.xml
+
+configs:
+  cloudflared-config:
+    content: |
+      tunnel: ${cloudflared_tunnel_id}
+      credentials-file: /run/secrets/${cloudflared_tunnel_id}.json
+
+      warp-routing:
+        enabled: true
+
+      # tunnel run parameters
+      edge-ip-version: auto
+      region: us
+
+      ingress:
+        - hostname: vault.jeremyserver.me
+          service: http://vaultwarden:80
+        - hostname: test.jeremyserver.me
+          service: hello_world
+        - service: http_status:404
+  fah-config:
+    content: |
+      <config>
+        <!-- Account -->
+        <account-token v="${fah_token}"/>
+        <machine-name value="oracle-cloud"/>
+
+        <!-- Logging -->
+        <verbosity v="6" />
+
+        <!-- Resource settings -->
+        <cpus v="2"/>
+
+        <!-- Server -->
+        <allow v="127.0.0.1"/>
+
+        <!-- User information -->
+        <passkey v="${fah_passkey}"/>
+        <team v="${fah_team}"/>
+        <user v="${fah_user}"/>
+      </config>
+
+secrets:
+  cloudflared-credentials-file:
+    file: ./cloudflared-credentials-file.json
