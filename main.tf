@@ -240,6 +240,15 @@ resource "oci_core_instance" "main" {
       {
         write_files = [
           {
+            path    = "/etc/sysctl.d/local.conf",
+            content = <<-EOF
+            # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+            # Defaults to 212,992 bytes = 208 KiB. Update to 7,864,000 bytes = 7.5 MiB
+            net.core.rmem_max = 7864000
+            net.core.wmem_max = 7864000
+            EOF
+          },
+          {
             path = "/home/ubuntu/cloudflared-credentials-file.json"
             content = jsonencode({
               AccountTag   = var.cloudflared_account_tag,
