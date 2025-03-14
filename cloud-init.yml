@@ -1,5 +1,17 @@
 #cloud-config
 
+final_message: |
+  ## template: jinja
+
+  ───────────────────────────────────────
+  cloud-init has finished running.
+
+     Version: cloud-init {{version}}
+   Timestamp: {{timestamp}}
+  Datasource: {{datasource}}
+      Uptime: {{uptime}} seconds
+  ───────────────────────────────────────
+
 apt:
   sources:
     docker:
@@ -9,36 +21,39 @@ apt:
       # Fingerprint for Docker's GPG key
       keyid: 9DC858229FC7DD38854AE2D88D81803C0EBFCD88
       # Equivalent to `gpg --keyserver https://download.docker.com/linux/ubuntu/gpg --receive-keys [keyid]`
-      keyserver: 'https://download.docker.com/linux/ubuntu/gpg'
+      keyserver: "https://download.docker.com/linux/ubuntu/gpg"
 
 package_update: true
 package_upgrade: true
 package_reboot_if_required: true
 
 packages:
-  - apt: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+  - apt:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
   - snap:
-    - [oracle-cloud-agent, --classic]
+      - [oracle-cloud-agent, --classic]
 
 runcmd:
   # While I would prefer to use `disk_setup` and `fs_setup` to create the
-  # filesystem, the snap package oracle-cloud-agent is necessary to connect to
-  # iSCSI-attached volumes
+  # filesystem, the Snap package `oracle-cloud-agent` is necessary to connect to
+  # the iSCSI-attached volumes
   - sudo mkfs.ext3 /dev/oracleoci/oraclevdb
   - sudo mount --all
-  - sudo docker compose up
-  # I don't think this currently works in Oracle Cloud
-  # - sudo mkdir --parents /var/lib/cloud/instance/scripts/per-boot
-  # - |
-  #   sudo sh -c 'cat <<EOF > /var/lib/cloud/instance/scripts/per-boot/docker-compose-up.sh
-  #   #!/bin/bash
-
-  #   sudo docker compose up
-  #   EOF'
-  # - source /var/lib/cloud/instance/scripts/per-boot/docker-compose-up.sh
+  - sudo docker compose --file /home/ubuntu/docker-compose.yml up --detach
 
 ssh_import_id:
-  - 'gh:jeremy-code'
+  - "gh:jeremy-code"
 
 mounts:
-  - [/dev/oracleoci/oraclevdb, /mnt/oraclevdb, ext3, 'defaults,_netdev,noatime',  '0',  '2']
+  - [
+      /dev/oracleoci/oraclevdb,
+      /mnt/oraclevdb,
+      ext3,
+      "defaults,_netdev,noatime",
+      "0",
+      "2",
+    ]

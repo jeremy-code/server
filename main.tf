@@ -25,12 +25,12 @@ data "oci_core_image" "main" {
   image_id = (data.oci_core_images.main.images[0]).id
 }
 
-
 resource "oci_core_vcn" "main" {
-  dns_label      = "internal"
   cidr_blocks    = ["192.168.0.0/16"] # RFC 1918
   compartment_id = oci_identity_compartment.main.id
-  display_name   = "Internal VCN"
+  display_name   = "Main Virtual Cloud Network (VCN)"
+  dns_label      = "internal"
+  is_ipv6enabled = false
 }
 
 locals {
@@ -40,7 +40,7 @@ locals {
 
 resource "oci_core_security_list" "instance" {
   compartment_id = oci_identity_compartment.main.id
-  display_name   = "Internal Security List"
+  display_name   = "Main Comppute Instance Security List"
   vcn_id         = oci_core_vcn.main.id
 
   ingress_security_rules {
@@ -81,13 +81,13 @@ resource "oci_core_security_list" "instance" {
 
 resource "oci_core_internet_gateway" "main" {
   compartment_id = oci_identity_compartment.main.id
-  display_name   = "Internal Internet Gateway"
+  display_name   = "Main Internet Gateway"
   vcn_id         = oci_core_vcn.main.id
 }
 
 resource "oci_core_route_table" "main" {
   compartment_id = oci_identity_compartment.main.id
-  display_name   = "Internal Route Table"
+  display_name   = "Main Route Table with Internet Gateway"
   route_rules {
     description       = "Default route for internet gateway"
     destination       = "0.0.0.0/0"
@@ -101,7 +101,7 @@ resource "oci_core_subnet" "instance" {
   availability_domain = data.oci_identity_availability_domain.main.name
   cidr_block          = local.instance_subnet_cidr_blocks[0]
   compartment_id      = oci_identity_compartment.main.id
-  display_name        = "Internal Instance Subnet"
+  display_name        = "Main Compute Instance Subnet"
   dns_label           = "instance"
   route_table_id      = oci_core_route_table.main.id
   security_list_ids   = [oci_core_security_list.instance.id]
@@ -110,11 +110,11 @@ resource "oci_core_subnet" "instance" {
 
 resource "oci_core_security_list" "database" {
   compartment_id = oci_identity_compartment.main.id
-  display_name   = "Internal Database Security List"
+  display_name   = "Main Database Security List"
   vcn_id         = oci_core_vcn.main.id
 
   ingress_security_rules {
-    description = "Allow MySQL traffic from the internal instance subnet (3306)"
+    description = "Allow MySQL traffic from the main instance subnet (3306)"
     source      = oci_core_subnet.instance.cidr_block
     source_type = "CIDR_BLOCK"
     protocol    = 6 # TCP
@@ -125,7 +125,7 @@ resource "oci_core_security_list" "database" {
   }
 
   ingress_security_rules {
-    description = "Allow MySQL traffic from the internal instance subnet (33060)"
+    description = "Allow MySQL traffic from the main instance subnet (33060)"
     source      = oci_core_subnet.instance.cidr_block
     source_type = "CIDR_BLOCK"
     protocol    = 6 # TCP
@@ -140,7 +140,7 @@ resource "oci_core_subnet" "database" {
   availability_domain = data.oci_identity_availability_domain.main.name
   cidr_block          = local.database_subnet_cidr_blocks[0]
   compartment_id      = oci_identity_compartment.main.id
-  display_name        = "Internal database Subnet"
+  display_name        = "Main MySQL Database System Subnet"
   dns_label           = "database"
   security_list_ids   = [oci_core_security_list.database.id]
   vcn_id              = oci_core_vcn.main.id
@@ -181,20 +181,28 @@ resource "oci_mysql_mysql_db_system" "main" {
   data_storage {
     is_auto_expand_storage_enabled = false
   }
+  customer_contacts {
+    email = var.email_address
+  }
   data_storage_size_in_gb = 50
   database_management     = "DISABLED"
+  database_mode           = "READ_WRITE"
   deletion_policy {
     automatic_backup_retention = "RETAIN"
     final_backup               = "REQUIRE_FINAL_BACKUP"
     is_delete_protected        = true
   }
-  description    = "Internal MySQL DB System."
-  display_name   = "Internal MySQL DB System"
-  hostname_label = "mysql"
-  port           = 3306
-  port_x         = 33060
-  shape_name     = "MySQL.Free"
-  subnet_id      = oci_core_subnet.database.id
+  description         = "MySQL database system for use with Vaultwarden."
+  display_name        = "Main MySQL DB System"
+  hostname_label      = "mysql"
+  is_highly_available = false
+  port                = 3306
+  port_x              = 33060
+  read_endpoint {
+    is_enabled = false
+  }
+  shape_name = "MySQL.Free"
+  subnet_id  = oci_core_subnet.database.id
 
   lifecycle {
     prevent_destroy = true
@@ -216,24 +224,21 @@ resource "oci_core_instance" "main" {
   }
   availability_domain = data.oci_identity_availability_domain.main.name
   compartment_id      = oci_identity_compartment.main.id
-  display_name        = "Internal Instance"
-  shape               = data.oci_core_images.main.shape
-  shape_config {
-    memory_in_gbs = 24
-    ocpus         = 4
-  }
   create_vnic_details {
-    assign_private_dns_record = true
-    display_name              = "Internal Instance VNIC"
-    hostname_label            = "vnic"
-    subnet_id                 = oci_core_subnet.instance.id
+    assign_ipv6ip    = false
+    assign_public_ip = true
+    display_name     = "Main Compute Instance VNIC"
+    hostname_label   = "instance"
+    subnet_id        = oci_core_subnet.instance.id
   }
-  source_details {
-    boot_volume_size_in_gbs         = 50
-    boot_volume_vpus_per_gb         = 10
-    source_type                     = "image"
-    source_id                       = data.oci_core_image.main.id
-    is_preserve_boot_volume_enabled = true
+  display_name                        = "Main Compute Instance"
+  is_pv_encryption_in_transit_enabled = true
+  launch_options {
+    boot_volume_type                    = "PARAVIRTUALIZED"
+    firmware                            = "UEFI_64"
+    is_consistent_volume_naming_enabled = true
+    network_type                        = "PARAVIRTUALIZED"
+    remote_data_volume_type             = "PARAVIRTUALIZED"
   }
   metadata = {
     user_data = base64encode(format("%s\n%s", file("${path.module}/cloud-init.yml"), yamlencode(
@@ -251,9 +256,9 @@ resource "oci_core_instance" "main" {
           {
             path = "/home/ubuntu/cloudflared-credentials-file.json"
             content = jsonencode({
-              AccountTag   = var.cloudflared_account_tag,
-              TunnelID     = var.cloudflared_tunnel_id,
-              TunnelSecret = var.cloudflared_tunnel_secret
+              AccountTag   = var.cloudflared_config.account_tag,
+              TunnelID     = var.cloudflared_config.tunnel_id,
+              TunnelSecret = var.cloudflared_config.tunnel_secret
             })
           },
           {
@@ -263,11 +268,11 @@ resource "oci_core_instance" "main" {
               mysql_admin_password  = urlencode(oci_mysql_mysql_db_system.main.admin_password)
               mysql_host            = oci_mysql_mysql_db_system.main.ip_address
               mysql_port            = oci_mysql_mysql_db_system.main.port
-              cloudflared_tunnel_id = var.cloudflared_tunnel_id
-              fah_token             = var.fah_token
-              fah_passkey           = var.fah_passkey
-              fah_team              = var.fah_team
-              fah_user              = var.fah_user
+              cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
+              fah_token             = var.fah_config.token
+              fah_passkey           = var.fah_config.passkey
+              fah_team              = var.fah_config.team
+              fah_user              = var.fah_config.user
             })
           }
         ]
@@ -275,12 +280,25 @@ resource "oci_core_instance" "main" {
       )
     ))
   }
+  shape = data.oci_core_images.main.shape
+  shape_config {
+    baseline_ocpu_utilization = "BASELINE_1_1"
+    memory_in_gbs             = 24
+    ocpus                     = 4
+  }
+  source_details {
+    boot_volume_size_in_gbs         = 50
+    boot_volume_vpus_per_gb         = 10
+    source_type                     = "image"
+    source_id                       = data.oci_core_image.main.id
+    is_preserve_boot_volume_enabled = true
+  }
 }
 
 resource "oci_core_volume" "block" {
-  compartment_id      = oci_identity_compartment.main.id
   availability_domain = data.oci_identity_availability_domain.main.name
-  display_name        = "Internal Instance Volume"
+  compartment_id      = oci_identity_compartment.main.id
+  display_name        = "Main Instance Block Volume"
   size_in_gbs         = 50
   vpus_per_gb         = 0
 }
@@ -301,22 +319,22 @@ locals {
   silver_volume_backup_policy = one([for policy in data.oci_core_volume_backup_policies.oracle_defined.volume_backup_policies : policy if policy.display_name == "silver"])
 }
 
-resource "oci_core_volume_backup_policy_assignment" "boot" {
-  asset_id  = oci_core_instance.main.boot_volume_id
-  policy_id = local.silver_volume_backup_policy.id
-}
+resource "oci_core_volume_backup_policy_assignment" "main" {
+  for_each = tomap({
+    boot_volume_id  = oci_core_instance.main.boot_volume_id
+    block_volume_id = oci_core_volume.block.id
+  })
 
-resource "oci_core_volume_backup_policy_assignment" "block" {
-  asset_id  = oci_core_volume.block.id
+  asset_id  = each.value
   policy_id = local.silver_volume_backup_policy.id
 }
 
 resource "oci_core_volume_attachment" "block" {
   attachment_type                   = "iscsi"
   device                            = "/dev/oracleoci/oraclevdb"
-  display_name                      = "Internal Instance Volume Attachment"
+  display_name                      = "Main Instance Block Volume Attachment"
   instance_id                       = oci_core_instance.main.id
-  volume_id                         = oci_core_volume.block.id
-  is_shareable                      = true
   is_agent_auto_iscsi_login_enabled = true
+  use_chap                          = false
+  volume_id                         = oci_core_volume.block.id
 }

@@ -1,4 +1,3 @@
-
 output "compartment" {
   value = {
     id   = oci_identity_compartment.main.id
@@ -46,9 +45,21 @@ output "volumes" {
 
 output "instance" {
   value = {
-    id           = oci_core_instance.main.id
-    display_name = oci_core_instance.main.display_name
-    private_ip   = oci_core_instance.main.private_ip
-    public_ip    = oci_core_instance.main.public_ip
+    private_ip = oci_core_instance.main.private_ip
+    public_ip  = oci_core_instance.main.public_ip
+    shape = {
+      shape                        = oci_core_instance.main.shape
+      baseline_ocpu_utilization    = oci_core_instance.main.shape_config[0].baseline_ocpu_utilization
+      gpus                         = oci_core_instance.main.shape_config[0].gpus
+      memory_in_gbs                = oci_core_instance.main.shape_config[0].memory_in_gbs
+      networking_bandwidth_in_gbps = oci_core_instance.main.shape_config[0].networking_bandwidth_in_gbps
+      cpus                         = format("%s OCPUs, %s VCPUs", oci_core_instance.main.shape_config[0].ocpus, oci_core_instance.main.shape_config[0].vcpus)
+      processor_description        = oci_core_instance.main.shape_config[0].processor_description
+    }
+    source_details = {
+      boot_volume_size_in_gbs = oci_core_instance.main.source_details[0].boot_volume_size_in_gbs
+      boot_volume_vpus_per_gb = oci_core_instance.main.source_details[0].boot_volume_vpus_per_gb
+      source_type             = oci_core_instance.main.source_details[0].source_type
+    }
   }
 }

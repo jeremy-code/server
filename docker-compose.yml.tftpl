@@ -3,22 +3,24 @@ name: jeremyserver
 services:
   vaultwarden:
     container_name: vaultwarden
-    image: 'vaultwarden/server:latest'
-    restart: unless-stopped
+    image: "vaultwarden/server:latest"
+    restart: always
     environment:
+      # Database settings
       DATABASE_URL: mysql://${mysql_admin_username}:${mysql_admin_password}@${mysql_host}:${mysql_port}/vaultwarden
-      DOMAIN: 'https://vault.jeremyserver.me'
+      # General settings
+      DOMAIN: "https://vault.jeremyserver.me"
       TRASH_AUTO_DELETE_DAYS: 90
       SIGNUPS_ALLOWED: false
     volumes:
-      - '/mnt/oraclevdb/vaultwarden/:/data/'
+      - "/mnt/oraclevdb/vaultwarden/:/data/"
     networks:
       - vaultwarden-proxy
 
   robots-txt:
     container_name: robots-txt
     image: busybox
-    restart: unless-stopped
+    restart: always
     command: httpd -f -p 8001
     configs:
       - robots.txt
@@ -29,13 +31,13 @@ services:
 
   cloudflared:
     container_name: cloudflared
-    image: 'cloudflare/cloudflared:latest'
+    image: "cloudflare/cloudflared:latest"
     depends_on:
       - vaultwarden
       - robots-txt
-    restart: unless-stopped
+    restart: always
     volumes:
-      - '/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/'
+      - "/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/"
     command: tunnel run
     configs:
       - source: cloudflared-config
@@ -50,19 +52,19 @@ services:
   foldingathome:
     container_name: foldingathome
     image: lscr.io/linuxserver/foldingathome:latest
-    restart: unless-stopped
+    restart: always
     cpus: 2
     mem_limit: 12gb
     environment:
       - PUID=1001
       - PGID=1001
       - TZ=America/Los_Angeles
-      - CLI_ARGS=--config /app/config.xml
+      - CLI_ARGS=--config /run/configs/config.xml
     volumes:
       - /mnt/oraclevdb/foldingathome:/config/
     configs:
       - source: fah-config
-        target: /app/config.xml
+        target: /run/configs/config.xml
 
 networks:
   vaultwarden-proxy:
@@ -70,9 +72,8 @@ networks:
 
 configs:
   httpd-conf:
-    content: |
-      # https://github.com/mirror/busybox/blob/master/networking/httpd.c
-      I:robots.txt
+    # https://github.com/mirror/busybox/blob/master/networking/httpd.c
+    content: I:robots.txt
   robots.txt:
     content: |
       User-agent: *
@@ -101,22 +102,22 @@ configs:
     content: |
       <config>
         <!-- Account -->
-        <account-token v="${fah_token}"/>
-        <machine-name value="oracle-cloud"/>
+        <account-token v='${fah_token}'/>
+        <machine-name value='oracle-cloud'/>
 
         <!-- Logging -->
-        <verbosity v="6" />
+        <verbosity v='6'/>
 
         <!-- Resource settings -->
-        <cpus v="2"/>
+        <cpus v='2'/>
 
         <!-- Server -->
-        <allow v="127.0.0.1"/>
+        <allow v='127.0.0.1'/>
 
         <!-- User information -->
-        <passkey v="${fah_passkey}"/>
-        <team v="${fah_team}"/>
-        <user v="${fah_user}"/>
+        <passkey v='${fah_passkey}'/>
+        <team v='${fah_team}'/>
+        <user v='${fah_user}'/>
       </config>
 
 secrets:

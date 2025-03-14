@@ -1,9 +1,19 @@
 {
+  /* Visit https://code.visualstudio.com/docs/getstarted/settings to read more about this file */
+
+  // Text Editor
   "editor.defaultFormatter": "hashicorp.terraform",
-  "[terraform][terraform-vars]": {
-    "editor.defaultFormatter": "hashicorp.terraform"
-  },
+
+  // Terraform
   "terraform.experimentalFeatures.validateOnSave": true,
   "terraform.experimentalFeatures.prefillRequiredFields": true,
-  "terraform.codelens.referenceCount": true
+  "terraform.codelens.referenceCount": true,
+
+  // Language-Specific Configuration Overrides
+  "[dockercompose][yaml]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[terraform][terraform-vars]": {
+    "editor.defaultFormatter": "hashicorp.terraform"
+  }
 }
