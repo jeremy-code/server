@@ -209,6 +209,18 @@ resource "oci_mysql_mysql_db_system" "main" {
   }
 }
 
+data "oci_objectstorage_namespace" "main" {
+  compartment_id = oci_identity_compartment.main.id
+}
+
+resource "oci_objectstorage_bucket" "main" {
+  access_type    = "NoPublicAccess"
+  compartment_id = oci_identity_compartment.main.id
+  name           = "main-bucket"
+  namespace      = data.oci_objectstorage_namespace.main.namespace
+  storage_tier   = "Standard"
+}
+
 resource "oci_core_instance" "main" {
   agent_config {
     dynamic "plugins_config" {
@@ -254,25 +266,38 @@ resource "oci_core_instance" "main" {
             EOF
           },
           {
-            path = "/home/ubuntu/cloudflared-credentials-file.json"
+            path = "/home/ubuntu/cloudflared-credentials-file.json",
             content = jsonencode({
               AccountTag   = var.cloudflared_config.account_tag,
               TunnelID     = var.cloudflared_config.tunnel_id,
               TunnelSecret = var.cloudflared_config.tunnel_secret
             })
           },
+          { path = "/home/ubuntu/htpasswd", content = "jeremy:${bcrypt(var.rclone_password)}" },
           {
-            path = "/home/ubuntu/docker-compose.yml"
+            path = "/home/ubuntu/docker-compose.yml",
             content = templatefile("${path.module}/docker-compose.yml.tftpl", {
-              mysql_admin_username  = oci_mysql_mysql_db_system.main.admin_username
-              mysql_admin_password  = urlencode(oci_mysql_mysql_db_system.main.admin_password)
-              mysql_host            = oci_mysql_mysql_db_system.main.ip_address
-              mysql_port            = oci_mysql_mysql_db_system.main.port
+              # Vaultwarden
+              mysql_admin_username = oci_mysql_mysql_db_system.main.admin_username
+              mysql_admin_password = urlencode(oci_mysql_mysql_db_system.main.admin_password)
+              mysql_host           = oci_mysql_mysql_db_system.main.ip_address
+              mysql_port           = oci_mysql_mysql_db_system.main.port
+
+              # Rclone
+              bucket_name         = oci_objectstorage_bucket.main.name
+              region              = var.region
+              namespace           = data.oci_objectstorage_namespace.main.namespace
+              compartment_id      = oci_identity_compartment.main.id
+              bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
+
+              # Cloudflare
               cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
-              fah_token             = var.fah_config.token
-              fah_passkey           = var.fah_config.passkey
-              fah_team              = var.fah_config.team
-              fah_user              = var.fah_config.user
+
+              # Folding@home
+              fah_token   = var.fah_config.token
+              fah_passkey = var.fah_config.passkey
+              fah_team    = var.fah_config.team
+              fah_user    = var.fah_config.user
             })
           }
         ]
@@ -293,6 +318,30 @@ resource "oci_core_instance" "main" {
     source_id                       = data.oci_core_image.main.id
     is_preserve_boot_volume_enabled = true
   }
+
+  lifecycle {
+    # Due to bcrypt, which uses a random salt, the base64-encoded value will change every time
+    ignore_changes = [metadata]
+  }
+}
+
+resource "oci_identity_dynamic_group" "instance" {
+  compartment_id = var.tenancy_ocid
+  description    = "Dynamic group for the main instance."
+  matching_rule  = "instance.id = '${oci_core_instance.main.id}'"
+  name           = "main-instance-dynamic-group"
+}
+
+resource "oci_identity_policy" "instance-policy" {
+  compartment_id = oci_identity_compartment.main.id
+  description    = "Allow storage bucket read/write access to the main instance."
+  name           = "main-instance-policy"
+  # https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/objectstoragepolicyreference.htm
+  statements = [
+    "Allow dynamic-group '${oci_identity_dynamic_group.instance.name}' to manage objectstorage-namespaces in compartment ${oci_identity_compartment.main.name}",
+    "Allow dynamic-group '${oci_identity_dynamic_group.instance.name}' to use buckets in compartment ${oci_identity_compartment.main.name} where target.bucket.name = '${oci_objectstorage_bucket.main.name}'",
+    "Allow dynamic-group '${oci_identity_dynamic_group.instance.name}' to manage objects in compartment ${oci_identity_compartment.main.name} where target.bucket.name = '${oci_objectstorage_bucket.main.name}'"
+  ]
 }
 
 resource "oci_core_volume" "block" {
@@ -316,7 +365,13 @@ locals {
   # Monthly incremental backups: At midnight on the 1st of the month. Retain 12
   #                              months.
   # Yearly full backups: At midnight January 1. Retain 5 years.
-  silver_volume_backup_policy = one([for policy in data.oci_core_volume_backup_policies.oracle_defined.volume_backup_policies : policy if policy.display_name == "silver"])
+  silver_volume_backup_policy = one(
+    [
+      for policy in data.oci_core_volume_backup_policies.oracle_defined.volume_backup_policies
+      : policy
+      if policy.display_name == "silver"
+    ]
+  )
 }
 
 resource "oci_core_volume_backup_policy_assignment" "main" {

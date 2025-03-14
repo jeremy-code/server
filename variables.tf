@@ -84,3 +84,8 @@ variable "email_address" {
     error_message = "Invalid email address"
   }
 }
+
+variable "rclone_password" {
+  type        = string
+  description = "The password to be used for the Rclone WebDAV server"
+}

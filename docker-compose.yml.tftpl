@@ -17,6 +17,21 @@ services:
     networks:
       - vaultwarden-proxy
 
+  rclone:
+    container_name: rclone
+    image: "rclone/rclone:latest"
+    restart: always
+    command: serve webdav oos:${bucket_name} --addr rclone:8080 --etag-hash auto --htpasswd /run/secrets/htpasswd
+    volumes:
+      - "/mnt/oraclevdb/rclone/:/data/"
+    configs:
+      - source: rclone-config
+        target: /config/rclone/rclone.conf
+    secrets:
+      - htpasswd
+    networks:
+      - rclone-proxy
+
   robots-txt:
     container_name: robots-txt
     image: busybox
@@ -34,6 +49,7 @@ services:
     image: "cloudflare/cloudflared:latest"
     depends_on:
       - vaultwarden
+      - rclone
       - robots-txt
     restart: always
     volumes:
@@ -47,6 +63,7 @@ services:
         target: ${cloudflared_tunnel_id}.json
     networks:
       - vaultwarden-proxy
+      - rclone-proxy
       - robots-txt-proxy
 
   foldingathome:
@@ -68,9 +85,24 @@ services:
 
 networks:
   vaultwarden-proxy:
+  rclone-proxy:
   robots-txt-proxy:
 
 configs:
+  rclone-config:
+    content: |
+      [oos]
+      # https://rclone.org/oracleobjectstorage/
+      type = oracleobjectstorage
+      provider = instance_principal_auth
+      namespace = ${namespace}
+      compartment = ${compartment_id}
+      region = ${region}
+      storage_tier = ${bucket_storage_tier}
+      leave_parts_on_error = true
+      attempt_resume_upload = true
+      no_check_bucket = true
+      description = "Remote provider for Oracle Object Storage buckets using instance principals authentication"
   httpd-conf:
     # https://github.com/mirror/busybox/blob/master/networking/httpd.c
     content: I:robots.txt
@@ -91,12 +123,14 @@ configs:
       region: us
 
       ingress:
-        - hostname: vault.jeremyserver.me/robots.txt
+        %{~ for subdomain in ["vault.", "webdav.", ""] ~}
+        - hostname: ${subdomain}jeremyserver.me/robots.txt
           service: http://robots-txt:8001
+        %{~ endfor ~}
         - hostname: vault.jeremyserver.me
           service: http://vaultwarden:80
-        - hostname: jeremyserver.me/robots.txt
-          service: http://robots-txt:8001
+        - hostname: webdav.jeremyserver.me
+          service: http://rclone:8080
         - service: http_status:404
   fah-config:
     content: |
@@ -121,5 +155,7 @@ configs:
       </config>
 
 secrets:
+  htpasswd:
+    file: ./htpasswd
   cloudflared-credentials-file:
     file: ./cloudflared-credentials-file.json
