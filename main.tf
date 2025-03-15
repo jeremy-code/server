@@ -253,56 +253,59 @@ resource "oci_core_instance" "main" {
     remote_data_volume_type             = "PARAVIRTUALIZED"
   }
   metadata = {
-    user_data = base64encode(format("%s\n%s", file("${path.module}/cloud-init.yml"), yamlencode(
-      {
-        write_files = [
+    user_data = base64encode(
+      format(
+        "%s\n%s",
+        file("${path.module}/cloud-init.yml"),
+        yamlencode(
           {
-            path    = "/etc/sysctl.d/local.conf",
-            content = <<-EOF
-            # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
-            # Defaults to 212,992 bytes = 208 KiB. Update to 7,864,000 bytes = 7.5 MiB
-            net.core.rmem_max = 7864000
-            net.core.wmem_max = 7864000
-            EOF
-          },
-          {
-            path = "/home/ubuntu/cloudflared-credentials-file.json",
-            content = jsonencode({
-              AccountTag   = var.cloudflared_config.account_tag,
-              TunnelID     = var.cloudflared_config.tunnel_id,
-              TunnelSecret = var.cloudflared_config.tunnel_secret
-            })
-          },
-          { path = "/home/ubuntu/htpasswd", content = "jeremy:${bcrypt(var.rclone_password)}" },
-          {
-            path = "/home/ubuntu/docker-compose.yml",
-            content = templatefile("${path.module}/docker-compose.yml.tftpl", {
-              # Vaultwarden
-              mysql_admin_username = oci_mysql_mysql_db_system.main.admin_username
-              mysql_admin_password = urlencode(oci_mysql_mysql_db_system.main.admin_password)
-              mysql_host           = oci_mysql_mysql_db_system.main.ip_address
-              mysql_port           = oci_mysql_mysql_db_system.main.port
+            write_files = [
+              {
+                path    = "/etc/sysctl.d/local.conf",
+                content = <<-EOF
+                # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+                # Defaults to 212,992 bytes = 208 KiB. Update to 7,864,000 bytes = 7.5 MiB
+                net.core.rmem_max = 7864000
+                net.core.wmem_max = 7864000
+                EOF
+              },
+              {
+                path    = "/home/ubuntu/htpasswd",
+                content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}"
+              },
+              {
+                path = "/home/ubuntu/cloudflared-credentials-file.json",
+                content = jsonencode({
+                  AccountTag   = var.cloudflared_config.account_tag,
+                  TunnelID     = var.cloudflared_config.tunnel_id,
+                  TunnelSecret = var.cloudflared_config.tunnel_secret
+                })
+              },
 
-              # Rclone
-              bucket_name         = oci_objectstorage_bucket.main.name
-              region              = var.region
-              namespace           = data.oci_objectstorage_namespace.main.namespace
-              compartment_id      = oci_identity_compartment.main.id
-              bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
-
-              # Cloudflare
-              cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
-
-              # Folding@home
-              fah_token   = var.fah_config.token
-              fah_passkey = var.fah_config.passkey
-              fah_team    = var.fah_config.team
-              fah_user    = var.fah_config.user
-            })
+              {
+                path = "/home/ubuntu/docker-compose.yml",
+                content = templatefile("${path.module}/docker-compose.yml.tftpl", {
+                  server_domain = var.server_domain
+                  my_sql_config = {
+                    admin_username = oci_mysql_mysql_db_system.main.admin_username
+                    admin_password = urlencode(oci_mysql_mysql_db_system.main.admin_password)
+                    host           = oci_mysql_mysql_db_system.main.ip_address
+                    port           = oci_mysql_mysql_db_system.main.port
+                  }
+                  oos_config = {
+                    bucket_name         = oci_objectstorage_bucket.main.name
+                    region              = var.region
+                    namespace           = data.oci_objectstorage_namespace.main.namespace
+                    compartment_id      = oci_identity_compartment.main.id
+                    bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
+                  }
+                  cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
+                  fah_config            = var.fah_config
+                })
+              }
+            ]
           }
-        ]
-      }
-      )
+        )
     ))
   }
   shape = data.oci_core_images.main.shape

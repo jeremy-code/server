@@ -7,9 +7,9 @@ services:
     restart: always
     environment:
       # Database settings
-      DATABASE_URL: mysql://${mysql_admin_username}:${mysql_admin_password}@${mysql_host}:${mysql_port}/vaultwarden
+      DATABASE_URL: mysql://${mysql_config.admin_username}:${mysql_config.admin_password}@${mysql_config.host}:${mysql_config.port}/vaultwarden
       # General settings
-      DOMAIN: "https://vault.jeremyserver.me"
+      DOMAIN: "https://vault.${server_domain}"
       TRASH_AUTO_DELETE_DAYS: 90
       SIGNUPS_ALLOWED: false
     volumes:
@@ -21,7 +21,7 @@ services:
     container_name: rclone
     image: "rclone/rclone:latest"
     restart: always
-    command: serve webdav oos:${bucket_name} --addr rclone:8080 --etag-hash auto --htpasswd /run/secrets/htpasswd
+    command: serve webdav oos:${oos_config.bucket_name} --addr rclone:8080 --etag-hash auto --htpasswd /run/secrets/htpasswd
     volumes:
       - "/mnt/oraclevdb/rclone/:/data/"
     configs:
@@ -95,10 +95,10 @@ configs:
       # https://rclone.org/oracleobjectstorage/
       type = oracleobjectstorage
       provider = instance_principal_auth
-      namespace = ${namespace}
-      compartment = ${compartment_id}
-      region = ${region}
-      storage_tier = ${bucket_storage_tier}
+      namespace = ${oos_config.namespace}
+      compartment = ${oos_config.compartment_id}
+      region = ${oos_config.region}
+      storage_tier = ${oos_config.bucket_storage_tier}
       leave_parts_on_error = true
       attempt_resume_upload = true
       no_check_bucket = true
@@ -124,19 +124,19 @@ configs:
 
       ingress:
         %{~ for subdomain in ["vault.", "webdav.", ""] ~}
-        - hostname: ${subdomain}jeremyserver.me/robots.txt
+        - hostname: ${subdomain}${server_domain}/robots.txt
           service: http://robots-txt:8001
         %{~ endfor ~}
-        - hostname: vault.jeremyserver.me
+        - hostname: vault.${server_domain}
           service: http://vaultwarden:80
-        - hostname: webdav.jeremyserver.me
+        - hostname: webdav.${server_domain}
           service: http://rclone:8080
         - service: http_status:404
   fah-config:
     content: |
       <config>
         <!-- Account -->
-        <account-token v='${fah_token}'/>
+        <account-token v='${fah_config.token}'/>
         <machine-name value='oracle-cloud'/>
 
         <!-- Logging -->
@@ -149,9 +149,9 @@ configs:
         <allow v='127.0.0.1'/>
 
         <!-- User information -->
-        <passkey v='${fah_passkey}'/>
-        <team v='${fah_team}'/>
-        <user v='${fah_user}'/>
+        <passkey v='${fah_config.passkey}'/>
+        <team v='${fah_config.team}'/>
+        <user v='${fah_config.user}'/>
       </config>
 
 secrets:
