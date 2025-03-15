@@ -286,7 +286,7 @@ resource "oci_core_instance" "main" {
                 path = "/home/ubuntu/docker-compose.yml",
                 content = templatefile("${path.module}/docker-compose.yml.tftpl", {
                   server_domain = var.server_domain
-                  my_sql_config = {
+                  mysql_config = {
                     admin_username = oci_mysql_mysql_db_system.main.admin_username
                     admin_password = urlencode(oci_mysql_mysql_db_system.main.admin_password)
                     host           = oci_mysql_mysql_db_system.main.ip_address
@@ -298,6 +298,10 @@ resource "oci_core_instance" "main" {
                     namespace           = data.oci_objectstorage_namespace.main.namespace
                     compartment_id      = oci_identity_compartment.main.id
                     bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
+                  }
+                  gatus_config = {
+                    username                = var.gatus_config.username
+                    encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
                   }
                   cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
                   fah_config            = var.fah_config

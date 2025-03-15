@@ -81,6 +81,14 @@ variable "rclone_config" {
   description = "The Rclone user credentials for authenticating to the WebDAV server"
 }
 
+variable "gatus_config" {
+  type = object({
+    username = string
+    password = string
+  })
+  description = "The credentials for Gatus basic authentication"
+}
+
 variable "cloudflared_config" {
   type = object({
     account_tag   = string
