@@ -6,7 +6,7 @@ final_message: |
   ───────────────────────────────────────
   cloud-init has finished running.
 
-     Version: cloud-init {{version}}
+     Version: /usr/bin/cloud-init {{version}}
    Timestamp: {{timestamp}}
   Datasource: {{datasource}}
       Uptime: {{uptime}} seconds
@@ -23,6 +23,16 @@ apt:
       # Equivalent to `gpg --keyserver https://download.docker.com/linux/ubuntu/gpg --receive-keys [keyid]`
       keyserver: "https://download.docker.com/linux/ubuntu/gpg"
 
+mounts:
+  - [
+      /dev/oracleoci/oraclevdb,
+      /mnt/oraclevdb,
+      ext3,
+      "defaults,_netdev,noatime",
+      "0",
+      "2",
+    ]
+
 package_update: true
 package_upgrade: true
 package_reboot_if_required: true
@@ -38,22 +48,21 @@ packages:
       - [oracle-cloud-agent, --classic]
 
 runcmd:
-  # While I would prefer to use `disk_setup` and `fs_setup` to create the
-  # filesystem, the Snap package `oracle-cloud-agent` is necessary to connect to
-  # the iSCSI-attached volumes
+  # The `disk_setup` and `mounts` modules run in the "init" stage while the
+  # "package_update_upgrade_install" module runs later in the "final" stage.
+  # Since the Snap package `oracle-cloud-agent` is necessary to connect to
+  # iSCSI-attached volumes, those modules cannot be used to create the
+  # filesystem.
   - sudo mkfs.ext3 /dev/oracleoci/oraclevdb
   - sudo mount --all
-  - sudo docker compose --file /home/ubuntu/docker-compose.yml up --detach
+  - sudo docker compose --file /home/jeremy/docker-compose.yml up --detach
 
+# https://manpages.ubuntu.com/manpages/noble/en/man1/ssh-import-id.1.html
 ssh_import_id:
   - "gh:jeremy-code"
 
-mounts:
-  - [
-      /dev/oracleoci/oraclevdb,
-      /mnt/oraclevdb,
-      ext3,
-      "defaults,_netdev,noatime",
-      "0",
-      "2",
-    ]
+timezone: "America/Los_Angeles"
+
+user:
+  name: "jeremy"
+  gecos: "Jeremy Nguyen,,,"

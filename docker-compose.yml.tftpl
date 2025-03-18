@@ -7,19 +7,21 @@ services:
     restart: always
     environment:
       # Database settings
-      DATABASE_URL: mysql://${mysql_config.admin_username}:${mysql_config.admin_password}@${mysql_config.host}:${mysql_config.port}/vaultwarden
+      DATABASE_URL_FILE: "/run/secrets/vaultwarden-database-url"
       # General settings
       DOMAIN: "https://vault.${server_domain}"
       TRASH_AUTO_DELETE_DAYS: 90
       SIGNUPS_ALLOWED: false
     volumes:
       - "/mnt/oraclevdb/vaultwarden/:/data/"
+    secrets:
+      - vaultwarden-database-url
 
   rclone:
     container_name: rclone
     image: "rclone/rclone:latest"
     restart: always
-    command: serve webdav oos:${oos_config.bucket_name} --addr rclone:8080 --etag-hash auto --htpasswd /run/secrets/htpasswd
+    command: serve webdav oos:${oos_config.bucket_name} --addr rclone:9800 --etag-hash auto --htpasswd /run/secrets/htpasswd
     volumes:
       - "/mnt/oraclevdb/rclone/:/data/"
     configs:
@@ -32,7 +34,7 @@ services:
     container_name: robots-txt
     image: busybox
     restart: always
-    command: httpd -f -p 8001
+    command: httpd -f -p 8008
     configs:
       - robots.txt
       - source: httpd-conf
@@ -47,6 +49,10 @@ services:
       - rclone
       - robots-txt
       - foldingathome
+    environment:
+      USERNAME: ${gatus_config.username}
+      ENCODED_HASHED_PASSWORD: ${gatus_config.encoded_hashed_password}
+      SERVER_DOMAIN: ${server_domain}
     volumes:
       - "/mnt/oraclevdb/gatus/:/data/"
     configs:
@@ -71,7 +77,6 @@ services:
     secrets:
       - source: cloudflared-credentials-file
         target: ${cloudflared_tunnel_id}.json
-
   foldingathome:
     container_name: foldingathome
     image: lscr.io/linuxserver/foldingathome:latest
@@ -79,10 +84,10 @@ services:
     cpus: 2
     mem_limit: 12gb
     environment:
-      - PUID=1001
-      - PGID=1001
-      - TZ=America/Los_Angeles
-      - CLI_ARGS=--config /run/configs/config.xml
+      PUID: 1001
+      PGID: 1001
+      TZ: America/Los_Angeles
+      CLI_ARGS: "--config /run/configs/config.xml"
     volumes:
       - /mnt/oraclevdb/foldingathome:/config/
     configs:
@@ -105,88 +110,14 @@ configs:
       no_check_bucket = true
       description = "Remote provider for Oracle Object Storage buckets using instance principals authentication"
   httpd-conf:
-    # https://github.com/mirror/busybox/blob/master/networking/httpd.c
+    # https://git.busybox.net/busybox/tree/networking/httpd.c
     content: I:robots.txt
   robots.txt:
     content: |
       User-agent: *
       Disallow: /
   gatus-config:
-    content: |
-      storage:
-        type: sqlite
-        path: /data/data.db
-        caching: true
-
-      security:
-        basic:
-          username: "${gatus_config.username}"
-          password-bcrypt-base64: "${gatus_config.encoded_hashed_password}"
-
-      web:
-        port: 8081
-
-      .defs:
-        .endpoints:
-          - &default-endpoint
-            enabled: true
-            interval: 10m
-          - &status-200
-            <<: *default-endpoint
-            conditions:
-              - "[STATUS] == 200"
-              - "[RESPONSE_TIME] < 1000"
-          - &status-308
-            <<: *default-endpoint
-            client:
-              ignore-redirect: true
-            conditions:
-              - "[STATUS] == 308"
-              - "[RESPONSE_TIME] < 500"
-          - &status-401
-            <<: *default-endpoint
-            conditions:
-              - "[STATUS] == 401"
-              - "[BODY] == 401 Unauthorized"
-              - "[RESPONSE_TIME] < 1000"
-
-      endpoints:
-        # Core
-        - name: Vaultwarden
-          group: core
-          url: "https://vault.jeremyserver.me/api/alive"
-          <<: *status-200
-          conditions: &vaultwarden-conditions
-            - "[STATUS] == 200"
-            - "[RESPONSE_TIME] < 1000"
-            # ISO 8601 string is 27 characters long + 2 quotes
-            - "len([BODY]) == 29"
-        - name: Rclone
-          group: core
-          url: "https://webdav.jeremyserver.me"
-          <<: *status-401
-        - name: robots.txt
-          group: core
-          url: "https://jeremyserver.me/robots.txt"
-          <<: *status-200
-        # Internal
-        - name: Vaultwarden (Internal)
-          group: internal
-          url: "http://vaultwarden:80/api/alive"
-          <<: *status-200
-          conditions: *vaultwarden-conditions
-        - name: Rclone (Internal)
-          group: internal
-          url: "http://rclone:8080"
-          <<: *status-401
-        - name: robots.txt (Internal)
-          group: internal
-          url: "http://robots-txt:8001"
-          <<: *status-200
-        - name: Folding@home
-          group: internal
-          url: "http://foldingathome:7396"
-          <<: *status-200
+    file: ./gatus-config.yaml
   cloudflared-config:
     content: |
       tunnel: ${cloudflared_tunnel_id}
@@ -202,14 +133,14 @@ configs:
       ingress:
         %{~ for subdomain in ["vault.", "webdav.", "status", ""] ~}
         - hostname: ${subdomain}${server_domain}/robots.txt
-          service: http://robots-txt:8001
+          service: http://robots-txt:8008
         %{~ endfor ~}
         - hostname: vault.${server_domain}
           service: http://vaultwarden:80
         - hostname: webdav.${server_domain}
-          service: http://rclone:8080
+          service: http://rclone:9800
         - hostname: status.${server_domain}
-          service: http://gatus:8081
+          service: http://gatus:8080
         - service: http_status:404
   fah-config:
     content: |
@@ -231,6 +162,8 @@ configs:
       </config>
 
 secrets:
+  vaultwarden-database-url:
+    file: ./vaultwarden-database-url
   htpasswd:
     file: ./htpasswd
   cloudflared-credentials-file:

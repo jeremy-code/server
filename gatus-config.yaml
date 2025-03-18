@@ -1,0 +1,74 @@
+storage:
+  type: sqlite
+  path: /data/data.db
+  caching: true
+
+security:
+  basic:
+    username: "${USERNAME}"
+    password-bcrypt-base64: "${ENCODED_HASHED_PASSWORD}"
+
+web:
+  port: 8080
+
+.defs:
+  .endpoints:
+    - &default-endpoint
+      enabled: true
+      interval: 10m
+    - &status-200
+      <<: *default-endpoint
+      conditions:
+        - "[STATUS] == 200"
+        - "[RESPONSE_TIME] < 750"
+    - &status-307
+      <<: *default-endpoint
+      client:
+        ignore-redirect: true
+      conditions:
+        - "[STATUS] == 307"
+        - "[RESPONSE_TIME] < 750"
+    - &status-401
+      <<: *default-endpoint
+      conditions:
+        - "[STATUS] == 401"
+        - "[BODY] == 401 Unauthorized"
+        - "[RESPONSE_TIME] < 750"
+
+endpoints:
+  # Core
+  - name: Vaultwarden
+    group: core
+    url: "https://vault.${SERVER_DOMAIN}/api/alive"
+    <<: *default-endpoint
+    conditions: &vaultwarden-conditions
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 750"
+      # ISO 8601 string is 27 characters long + 2 quotes
+      - "len([BODY]) == 29"
+  - name: Rclone
+    group: core
+    url: "https://webdav.${SERVER_DOMAIN}"
+    <<: *status-401
+  - name: robots.txt
+    group: core
+    url: "https://${SERVER_DOMAIN}/robots.txt"
+    <<: *status-200
+  # Internal
+  - name: Vaultwarden (Internal)
+    group: internal
+    url: "http://vaultwarden:80/api/alive"
+    <<: *default-endpoint
+    conditions: *vaultwarden-conditions
+  - name: Rclone (Internal)
+    group: internal
+    url: "http://rclone:9800"
+    <<: *status-401
+  - name: robots.txt (Internal)
+    group: internal
+    url: "http://robots-txt:8008"
+    <<: *status-200
+  - name: Folding@home
+    group: internal
+    url: "http://foldingathome:7396"
+    <<: *status-307

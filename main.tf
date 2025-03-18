@@ -270,28 +270,41 @@ resource "oci_core_instance" "main" {
                 EOF
               },
               {
-                path    = "/home/ubuntu/htpasswd",
-                content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}"
+                path    = "/home/jeremy/htpasswd",
+                content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
+                # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
+                permissions = "0400",
               },
               {
-                path = "/home/ubuntu/cloudflared-credentials-file.json",
+                path = "/home/jeremy/vaultwarden-database-url",
+                content = join("", [
+                  "mysql://",
+                  oci_mysql_mysql_db_system.main.admin_username,
+                  ":",
+                  urlencode(oci_mysql_mysql_db_system.main.admin_password),
+                  "@",
+                  oci_mysql_mysql_db_system.main.ip_address,
+                  ":",
+                  oci_mysql_mysql_db_system.main.port,
+                  "/vaultwarden"
+                ]),
+              },
+              {
+                path    = "/home/jeremy/gatus-config.yaml",
+                content = file("${path.module}/gatus-config.yaml"),
+              },
+              {
+                path = "/home/jeremy/cloudflared-credentials-file.json",
                 content = jsonencode({
                   AccountTag   = var.cloudflared_config.account_tag,
                   TunnelID     = var.cloudflared_config.tunnel_id,
                   TunnelSecret = var.cloudflared_config.tunnel_secret
-                })
+                }),
               },
-
               {
-                path = "/home/ubuntu/docker-compose.yml",
+                path = "/home/jeremy/docker-compose.yml",
                 content = templatefile("${path.module}/docker-compose.yml.tftpl", {
                   server_domain = var.server_domain
-                  mysql_config = {
-                    admin_username = oci_mysql_mysql_db_system.main.admin_username
-                    admin_password = urlencode(oci_mysql_mysql_db_system.main.admin_password)
-                    host           = oci_mysql_mysql_db_system.main.ip_address
-                    port           = oci_mysql_mysql_db_system.main.port
-                  }
                   oos_config = {
                     bucket_name         = oci_objectstorage_bucket.main.name
                     region              = var.region
@@ -327,8 +340,15 @@ resource "oci_core_instance" "main" {
   }
 
   lifecycle {
-    # Due to bcrypt, which uses a random salt, the base64-encoded value will change every time
-    ignore_changes = [metadata]
+    ignore_changes = [
+      # Since the `bcrypt` function always uses a random salt, the Base64-encoded
+      # value will change on each run even when the value is the same. Hence, to
+      # prevent unnecessary destructions, changes to the `metadata` attribute are
+      # ignored. When the metadata actually changes, run `terraform plan` or
+      # `terraform apply` with `-replace="oci_core_instance.main"` to force
+      # replacement (or comment out this line).
+      metadata
+    ]
   }
 }
 
