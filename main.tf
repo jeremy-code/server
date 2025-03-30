@@ -46,8 +46,8 @@ resource "oci_core_security_list" "instance" {
   ingress_security_rules {
     description = "Allow SSH traffic from RRWE"
     # RRWE, Charter Communications Inc (AS20001)
-    # https://whois.arin.net/rest/net/NET-23-240-0-0-1
-    source      = "23.240.0.0/14"
+    # https://whois.arin.net/rest/net/NET-172-88-0-0-1
+    source      = "172.88.0.0/14"
     source_type = "CIDR_BLOCK"
     protocol    = 6 # TCP
     tcp_options {
@@ -270,10 +270,32 @@ resource "oci_core_instance" "main" {
                 EOF
               },
               {
+                path        = "/etc/environment",
+                owner       = "root:root",
+                permissions = "0644",
+                append      = true,
+                content     = <<-EOF
+                # https://manpages.ubuntu.com/manpages/noble/man8/pam_env.8.html
+
+                # Docker CLI
+                # https://docs.docker.com/reference/cli/docker/#environment-variables
+
+                # Enable Docker Content Trust, which must be set with an
+                # environment variable for `docker compose up`
+                DOCKER_CONTENT_TRUST=1
+
+                # Docker Compose
+                # https://docs.docker.com/compose/how-tos/environment-variables/envvars/
+
+                COMPOSE_FILE=/home/jeremy/docker-compose.yml
+                COMPOSE_REMOVE_ORPHANS=1
+                EOF
+              },
+              {
                 path    = "/home/jeremy/htpasswd",
                 content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
                 # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
-                permissions = "0400",
+                permissions = "0440",
               },
               {
                 path = "/home/jeremy/vaultwarden-database-url",

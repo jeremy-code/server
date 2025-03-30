@@ -55,7 +55,7 @@ runcmd:
   # filesystem.
   - sudo mkfs.ext3 /dev/oracleoci/oraclevdb
   - sudo mount --all
-  - sudo docker compose --file /home/jeremy/docker-compose.yml up --detach
+  - sudo docker compose up --detach
 
 # https://manpages.ubuntu.com/manpages/noble/en/man1/ssh-import-id.1.html
 ssh_import_id:
