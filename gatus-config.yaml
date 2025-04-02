@@ -11,29 +11,47 @@ security:
 web:
   port: 8080
 
+alerting:
+  email:
+    enabled: true
+    from: "${EMAIL_FROM}"
+    to: "${EMAIL_TO}"
+    host: "${SMTP_HOST}"
+    port: 587
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+    default-alert:
+      enabled: true
+      failure-threshold: 3
+      success-threshold: 2
+      send-on-resolved: true
+      description: "healthcheck failed"
+
 .defs:
   .endpoints:
     - &default-endpoint
       enabled: true
       interval: 10m
+      alerts:
+        - type: email
     - &status-200
       <<: *default-endpoint
       conditions:
         - "[STATUS] == 200"
-        - "[RESPONSE_TIME] < 750"
+        - "[RESPONSE_TIME] < 1000"
     - &status-307
       <<: *default-endpoint
       client:
         ignore-redirect: true
       conditions:
         - "[STATUS] == 307"
-        - "[RESPONSE_TIME] < 750"
+        - "[RESPONSE_TIME] < 1000"
     - &status-401
       <<: *default-endpoint
       conditions:
         - "[STATUS] == 401"
         - "[BODY] == 401 Unauthorized"
-        - "[RESPONSE_TIME] < 750"
+        - "[RESPONSE_TIME] < 1000"
 
 endpoints:
   # Core

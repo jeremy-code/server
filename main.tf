@@ -221,6 +221,33 @@ resource "oci_objectstorage_bucket" "main" {
   storage_tier   = "Standard"
 }
 
+resource "oci_email_email_domain" "main" {
+  compartment_id = oci_identity_compartment.main.id
+  name           = "jerm.sh"
+  description    = "Email domain for home server."
+}
+
+resource "oci_email_email_return_path" "main" {
+  name               = "mail.jerm.sh"
+  description        = "Custom return path (bounce address) for domain mail.jerm.sh"
+  parent_resource_id = oci_email_email_domain.main.id
+}
+
+resource "oci_identity_smtp_credential" "main" {
+  user_id     = var.user_ocid
+  description = "Main SMTP credentials"
+}
+
+resource "oci_email_sender" "vaultwarden" {
+  compartment_id = oci_identity_compartment.main.id
+  email_address  = "vault@jerm.sh"
+}
+
+resource "oci_email_sender" "gatus" {
+  compartment_id = oci_identity_compartment.main.id
+  email_address  = "status@jerm.sh"
+}
+
 resource "oci_core_instance" "main" {
   agent_config {
     dynamic "plugins_config" {
@@ -339,7 +366,17 @@ resource "oci_core_instance" "main" {
                     encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
                   }
                   cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
-                  fah_config            = var.fah_config
+                  fah_config            = var.fah_config,
+                  smtp_config = {
+                    username = oci_identity_smtp_credential.main.username,
+                    password = oci_identity_smtp_credential.main.password,
+                    host     = "smtp.email.${var.region}.oci.oraclecloud.com",
+                  }
+                  email = {
+                    vaultwarden = oci_email_sender.vaultwarden.email_address,
+                    gatus       = oci_email_sender.gatus.email_address,
+                    owner       = var.email_address
+                  }
                 })
               }
             ]

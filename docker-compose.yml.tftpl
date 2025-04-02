@@ -12,6 +12,15 @@ services:
       DOMAIN: "https://vault.${server_domain}"
       TRASH_AUTO_DELETE_DAYS: 90
       SIGNUPS_ALLOWED: false
+      # Advanced settings
+      IP_HEADER: "CF-Connecting-IP" # https://developers.cloudflare.com/fundamentals/reference/http-headers/
+      EXPERIMENTAL_CLIENT_FEATURE_FLAGS: "ssh-key-vault-item"
+      # SMTP Email settings
+      SMTP_HOST: "${smtp_config.host}"
+      SMTP_FROM: "${email.vaultwarden}"
+      SMTP_FROM_NAME: "Vaultwarden"
+      SMTP_USERNAME: "${smtp_config.username}"
+      SMTP_PASSWORD: "${smtp_config.password}"
     volumes:
       - "/mnt/oraclevdb/vaultwarden/:/data/"
     secrets:
@@ -34,12 +43,16 @@ services:
     container_name: robots-txt
     image: busybox
     restart: always
-    user: 65532:65532
+    user: "1001:1001"
     command: httpd -f -p 8008
     configs:
-      - robots.txt
+      - source: robots.txt
+        uid: "1001"
+        gid: "1001"
       - source: httpd-conf
         target: /etc/httpd.conf
+        uid: "1001"
+        gid: "1001"
 
   gatus:
     container_name: gatus
@@ -51,9 +64,14 @@ services:
       - robots-txt
       - foldingathome
     environment:
-      USERNAME: ${gatus_config.username}
-      ENCODED_HASHED_PASSWORD: ${gatus_config.encoded_hashed_password}
-      SERVER_DOMAIN: ${server_domain}
+      USERNAME: "${gatus_config.username}"
+      ENCODED_HASHED_PASSWORD: "${gatus_config.encoded_hashed_password}"
+      SERVER_DOMAIN: "${server_domain}"
+      EMAIL_FROM: "${email.gatus}"
+      EMAIL_TO: "${email.owner}"
+      SMTP_HOST: "${smtp_config.host}"
+      SMTP_USERNAME: "${smtp_config.username}"
+      SMTP_PASSWORD: "${smtp_config.password}"
     volumes:
       - "/mnt/oraclevdb/gatus/:/data/"
     configs:
@@ -102,7 +120,6 @@ services:
         target: /run/configs/config.xml
         uid: "1001"
         gid: "1001"
-        mode: 0400
 
 configs:
   rclone-config:
