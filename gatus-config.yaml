@@ -90,3 +90,14 @@ endpoints:
     group: internal
     url: "http://foldingathome:7396"
     <<: *status-307
+  - name: Instance Metadata
+    group: internal
+    url: "http://169.254.169.254/opc/v2/instance/"
+    conditions:
+      - "[STATUS] == 200"
+      - "[RESPONSE_TIME] < 100"
+      - "[IP] == 169.254.169.254"
+      - "[BODY].state == Running"
+    headers:
+      Authorization: "Bearer Oracle"
+    <<: *default-endpoint
