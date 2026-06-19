@@ -270,7 +270,7 @@ resource "oci_core_instance" "main" {
     user_data = base64encode(
       format(
         "%s\n%s",
-        file("${path.module}/cloud-init.yml"),
+        file("${path.module}/assets/cloud-init.yml"),
         yamlencode(
           {
             write_files = [
@@ -327,7 +327,7 @@ resource "oci_core_instance" "main" {
               },
               {
                 path    = "/home/jeremy/gatus-config.yaml",
-                content = file("${path.module}/gatus-config.yaml"),
+                content = file("${path.module}/assets/gatus-config.yaml"),
               },
               {
                 path = "/home/jeremy/cloudflared-credentials-file.json",
@@ -339,7 +339,7 @@ resource "oci_core_instance" "main" {
               },
               {
                 path = "/home/jeremy/docker-compose.yml",
-                content = templatefile("${path.module}/docker-compose.yml.tftpl", {
+                content = templatefile("${path.module}/assets/docker-compose.yml.tftpl", {
                   server_domain = var.server_domain
                   oos_config = {
                     bucket_name         = oci_objectstorage_bucket.main.name
