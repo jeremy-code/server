@@ -136,12 +136,12 @@ resource "oci_core_subnet" "database" {
 locals {
   enabled_plugin_names = [
     "Vulnerability Scanning",
-    "Management Agent",
     "Cloud Guard Workload Protection",
     "Block Volume Management",
-    "Bastion"
   ]
   disabled_plugin_names = [
+    "Bastion",
+    "Management Agent",
     "Oracle Autonomous Linux",
     "OS Management Service Agent",
     "Custom Logs Monitoring",
@@ -374,8 +374,8 @@ resource "oci_core_instance" "main" {
   shape = data.oci_core_images.main.shape
   shape_config {
     baseline_ocpu_utilization = "BASELINE_1_1"
-    memory_in_gbs             = 24
-    ocpus                     = 4
+    memory_in_gbs             = 12
+    ocpus                     = 2
   }
   source_details {
     boot_volume_size_in_gbs         = 50
