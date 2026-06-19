@@ -40,7 +40,7 @@ locals {
 
 resource "oci_core_security_list" "instance" {
   compartment_id = oci_identity_compartment.main.id
-  display_name   = "Main Comppute Instance Security List"
+  display_name   = "Main Compute Instance Security List"
   vcn_id         = oci_core_vcn.main.id
 
   ingress_security_rules {
@@ -48,19 +48,6 @@ resource "oci_core_security_list" "instance" {
     # RRWE, Charter Communications Inc (AS20001)
     # https://whois.arin.net/rest/net/NET-172-88-0-0-1
     source      = "172.88.0.0/14"
-    source_type = "CIDR_BLOCK"
-    protocol    = 6 # TCP
-    tcp_options {
-      min = 22
-      max = 22
-    }
-  }
-
-  ingress_security_rules {
-    description = "Allow SSH traffic from RR_WEST-2BLK"
-    # RR_WEST-2BLK, Charter Communications Inc (AS20001)
-    # https://whois.arin.net/rest/net/NET-66-74-0-0-1
-    source      = "66.74.0.0/15"
     source_type = "CIDR_BLOCK"
     protocol    = 6 # TCP
     tcp_options {
