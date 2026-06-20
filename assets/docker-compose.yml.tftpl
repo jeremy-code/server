@@ -102,6 +102,7 @@ services:
         uid: "65532"
         gid: "65532"
         mode: 0400
+
   foldingathome:
     container_name: foldingathome
     image: lscr.io/linuxserver/foldingathome:latest
@@ -120,6 +121,35 @@ services:
         target: /run/configs/config.xml
         uid: "1001"
         gid: "1001"
+
+  freshrss:
+    container_name: freshrss
+    image: freshrss/freshrss:latest
+    restart: always
+    volumes:
+      - ./freshrss/data/:/var/www/FreshRSS/data
+    configs:
+      - source: opml-xml
+        # While /var/wwww/FreshRSS/data/opml.xml would be preferred, since the
+        # data directory is a bind mount, Docker will error: "mountpoint
+        # ".../freshrss/data/opml.xml" is outside of rootfs"
+        target: /var/www/FreshRSS/opml.default.xml
+        uid: "33"
+        gid: "33"
+    environment:
+      TZ: America/Los_Angeles
+      CRON_MIN: 2,32 # Minutes 2, 31
+      FRESHRSS_INSTALL: |-
+        --default-user jeremy
+        --base-url https://rss.${server_domain}
+        --title "Jeremy's RSS feed"
+        --allow-anonymous
+        --allow-anonymous-refresh
+      FRESHRSS_USER: |-
+        --user jeremy
+        --language en
+        --email $${FRESHRSS_EMAIL}
+        --password $${FRESHRSS_PASSWORD}
 
 configs:
   rclone-config:
@@ -145,6 +175,8 @@ configs:
       Disallow: /
   gatus-config:
     file: ./gatus-config.yaml
+  opml-xml:
+    file: ./opml.xml
   cloudflared-config:
     content: |
       tunnel: ${cloudflared_tunnel_id}

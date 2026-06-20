@@ -15,8 +15,8 @@ data "oci_identity_availability_domain" "main" {
 
 resource "oci_kms_vault" "main" {
   compartment_id = oci_identity_compartment.main.id
-  display_name    = "Main vault"
-  vault_type      = "DEFAULT"
+  display_name   = "Main vault"
+  vault_type     = "DEFAULT"
 }
 
 resource "oci_kms_key" "main" {
@@ -30,17 +30,17 @@ resource "oci_kms_key" "main" {
 }
 
 resource "oci_vault_secret" "mysql-db-password" {
-  compartment_id = oci_identity_compartment.main.id
-  key_id = oci_kms_key.main.id
-  secret_name = "mysql-db-password"
-  vault_id = oci_kms_vault.main.id
-  description = "MySQL database password"
+  compartment_id         = oci_identity_compartment.main.id
+  key_id                 = oci_kms_key.main.id
+  secret_name            = "mysql-db-password"
+  vault_id               = oci_kms_vault.main.id
+  description            = "MySQL database password"
   enable_auto_generation = true
 
   secret_generation_context {
     generation_template = "SECRETS_DEFAULT_PASSWORD"
-    generation_type = "PASSPHRASE"
-    passphrase_length = 16
+    generation_type     = "PASSPHRASE"
+    passphrase_length   = 16
   }
 }
 
@@ -343,6 +343,17 @@ resource "oci_core_instance" "main" {
                 COMPOSE_FILE=/home/jeremy/docker-compose.yml
                 COMPOSE_REMOVE_ORPHANS=1
                 EOF
+              },
+              {
+                path    = "/home/jeremy/.env",
+                content = <<-EOF
+                FRESHRSS_EMAIL=${var.freshrss_config.email}
+                FRESHRSS_PASSWORD=${var.freshrss_config.password}
+                EOF
+              },
+              {
+                path    = "/home/jeremy/opml.xml",
+                content = file("${path.module}/assets/opml.xml"),
               },
               {
                 path    = "/home/jeremy/htpasswd",
