@@ -13,6 +13,41 @@ data "oci_identity_availability_domain" "main" {
   id             = (data.oci_identity_availability_domains.main.availability_domains[0]).id
 }
 
+resource "oci_kms_vault" "main" {
+  compartment_id = oci_identity_compartment.main.id
+  display_name    = "Main vault"
+  vault_type      = "DEFAULT"
+}
+
+resource "oci_kms_key" "main" {
+  compartment_id      = oci_identity_compartment.main.id
+  display_name        = "Main key"
+  management_endpoint = oci_kms_vault.main.management_endpoint
+  key_shape {
+    algorithm = "AES"
+    length    = 32
+  }
+}
+
+resource "oci_vault_secret" "mysql-db-password" {
+  compartment_id = oci_identity_compartment.main.id
+  key_id = oci_kms_key.main.id
+  secret_name = "mysql-db-password"
+  vault_id = oci_kms_vault.main.id
+  description = "MySQL database password"
+  enable_auto_generation = true
+
+  secret_generation_context {
+    generation_template = "SECRETS_DEFAULT_PASSWORD"
+    generation_type = "PASSPHRASE"
+    passphrase_length = 16
+  }
+}
+
+data "oci_secrets_secretbundle" "mysql-db-password" {
+  secret_id = oci_vault_secret.mysql-db-password.id
+}
+
 data "oci_core_images" "main" {
   compartment_id = oci_identity_compartment.main.id
   # https://docs.oracle.com/en-us/iaas/images/ubuntu-2404/index.htm
@@ -161,7 +196,7 @@ locals {
 
 resource "oci_mysql_mysql_db_system" "main" {
   admin_username      = "admin"
-  admin_password      = var.mysql_admin_password
+  admin_password      = base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)
   availability_domain = data.oci_identity_availability_domain.main.name
   compartment_id      = oci_identity_compartment.main.id
   crash_recovery      = "ENABLED"
@@ -193,6 +228,10 @@ resource "oci_mysql_mysql_db_system" "main" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [
+      # Per manually updating password in console instead of destroying it
+      admin_password,
+    ]
   }
 }
 
@@ -317,7 +356,7 @@ resource "oci_core_instance" "main" {
                   "mysql://",
                   oci_mysql_mysql_db_system.main.admin_username,
                   ":",
-                  urlencode(oci_mysql_mysql_db_system.main.admin_password),
+                  urlencode(base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)),
                   "@",
                   oci_mysql_mysql_db_system.main.ip_address,
                   ":",

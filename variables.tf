@@ -33,29 +33,6 @@ variable "server_domain" {
   description = "The domain name for the server"
 }
 
-variable "mysql_admin_password" {
-  type        = string
-  description = "The password for the MySQL database"
-
-  validation {
-    # https://docs.oracle.com/en-us/iaas/tools/oci-cli/3.52.1/oci_cli_docs/cmdref/mysql/db-system/create.html#cmdoption-admin-password
-    condition = length(
-      var.mysql_admin_password
-      ) >= 8 && length(
-      var.mysql_admin_password
-      ) <= 32 && length(
-      regexall("[[:digit:]]", var.mysql_admin_password)
-      ) > 0 && length(
-      regexall("[[:lower:]]", var.mysql_admin_password)
-      ) > 0 && length(
-      regexall("[[:upper:]]", var.mysql_admin_password)
-      ) > 0 && length(
-      regexall("[^0-9A-Za-z]", var.mysql_admin_password)
-    ) > 0
-    error_message = "The password must be between 8 and 32 characters long and contain at least 1 numeric, lowercase, uppercase, and special (non-alphanumeric) character"
-  }
-}
-
 variable "email_address" {
   type        = string
   description = "The email address to contact for alerts"
