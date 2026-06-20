@@ -190,7 +190,7 @@ configs:
       region: us
 
       ingress:
-        %{~ for subdomain in ["vault.", "webdav.", "status.", ""] ~}
+        %{~ for subdomain in ["vault.", "webdav.", "status.", "freshrss", ""] ~}
         - hostname: ${subdomain}${server_domain}/robots.txt
           service: http://robots-txt:8008
         %{~ endfor ~}
@@ -200,6 +200,8 @@ configs:
           service: http://rclone:9800
         - hostname: status.${server_domain}
           service: http://gatus:8080
+        - hostname: freshrss.${server_domain}
+          service: http://freshrss:80
         - service: http_status:404
   fah-config:
     content: |

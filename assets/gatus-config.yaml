@@ -72,6 +72,10 @@ endpoints:
     group: core
     url: "https://${SERVER_DOMAIN}/robots.txt"
     <<: *status-200
+  - name: FreshRSS
+    group: core
+    url: "https://rss.${SERVER_DOMAIN}"
+    <<: *status-200
   # Internal
   - name: Vaultwarden (Internal)
     group: internal
@@ -85,6 +89,10 @@ endpoints:
   - name: robots.txt (Internal)
     group: internal
     url: "http://robots-txt:8008"
+    <<: *status-200
+  - name: FreshRSS (Internal)
+    group: internal
+    url: "http://freshrss:80"
     <<: *status-200
   - name: Folding@home
     group: internal
