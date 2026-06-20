@@ -50,6 +50,14 @@ variable "email_address" {
   }
 }
 
+variable "freshrss_config" {
+  type = object({
+    email    = string
+    password = string
+  })
+  description = "The admin user credentials for FreshRSS"
+}
+
 variable "rclone_config" {
   type = object({
     username = string
