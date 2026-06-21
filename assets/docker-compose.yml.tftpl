@@ -63,6 +63,7 @@ services:
       - rclone
       - robots-txt
       - foldingathome
+      - freshrss
     environment:
       USERNAME: "${gatus_config.username}"
       ENCODED_HASHED_PASSWORD: "${gatus_config.encoded_hashed_password}"
@@ -107,8 +108,6 @@ services:
     container_name: foldingathome
     image: lscr.io/linuxserver/foldingathome:latest
     restart: always
-    cpus: 2
-    mem_limit: 12gb
     environment:
       PUID: 1001
       PGID: 1001
@@ -127,7 +126,7 @@ services:
     image: freshrss/freshrss:latest
     restart: always
     volumes:
-      - ./freshrss/data/:/var/www/FreshRSS/data
+      - /mnt/oraclevdb/freshrss/:/var/www/FreshRSS/data
     configs:
       - source: opml-xml
         # While /var/wwww/FreshRSS/data/opml.xml would be preferred, since the
@@ -142,7 +141,7 @@ services:
       FRESHRSS_INSTALL: |-
         --default-user jeremy
         --base-url https://rss.${server_domain}
-        --title "Jeremy's RSS feed"
+        --title 'Jeremy's RSS feed'
         --allow-anonymous
         --allow-anonymous-refresh
       FRESHRSS_USER: |-
