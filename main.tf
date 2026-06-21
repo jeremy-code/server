@@ -233,8 +233,8 @@ resource "oci_email_email_domain" "main" {
 }
 
 resource "oci_email_email_return_path" "main" {
-  name               = format("mail.%s", var.server_domain)
-  description        = "Custom return path (bounce address) for domain mail.jerm.sh"
+  name               = "mail.${var.server_domain}"
+  description        = "Custom return path (bounce address) for domain mail.${var.server_domain}"
   parent_resource_id = oci_email_email_domain.main.id
 }
 
@@ -245,12 +245,12 @@ resource "oci_identity_smtp_credential" "main" {
 
 resource "oci_email_sender" "vaultwarden" {
   compartment_id = oci_identity_compartment.main.id
-  email_address  = format("vault@%s", var.server_domain)
+  email_address  = "vault@${var.server_domain}"
 }
 
 resource "oci_email_sender" "gatus" {
   compartment_id = oci_identity_compartment.main.id
-  email_address  = format("status@%s", var.server_domain)
+  email_address  = "status@${var.server_domain}"
 }
 
 locals {
