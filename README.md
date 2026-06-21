@@ -1,6 +1,11 @@
 # server
 
-[![GitHub License](https://img.shields.io/github/license/jeremy-code/server)](LICENSE) [![GitHub last commit](https://img.shields.io/github/last-commit/jeremy-code/server)](https://github.com/jeremy-code/server/commit/main)
+[github-actions]: https://www.github.com/jeremy-code/server/actions/workflows/ci.yml
+[github-actions-badge]: https://www.github.com/jeremy-code/server/actions/workflows/ci.yml/badge.svg
+[license-badge]: https://img.shields.io/github/license/jeremy-code/server
+[last-commit-badge]: https://img.shields.io/github/last-commit/jeremy-code/server
+
+[![GitHub Actions][github-actions-badge]][github-actions] [![GitHub License][license-badge]](LICENSE) [![GitHub last commit][last-commit-badge]](https://github.com/jeremy-code/server/commit/main)
 
 This repository contains the [Terraform](https://www.terraform.io/) configuration for my server. It is hosted on [Oracle Cloud](https://www.oracle.com/cloud/) and uses [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/). Currently, it runs the containers [`vaultwarden/server`](https://hub.docker.com/r/vaultwarden/server), [`rclone/rclone`](https://hub.docker.com/r/rclone/rclone), [`docker/busybox`](https://hub.docker.com/_/busybox), [`cloudflare/cloudflared`](https://hub.docker.com/r/cloudflare/cloudflared), and [`linuxserver/foldingathome`](https://docs.linuxserver.io/images/docker-foldingathome/) using [Docker Compose](https://docs.docker.com/compose/).
 
