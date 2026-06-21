@@ -5,6 +5,7 @@ services:
     container_name: vaultwarden
     image: "vaultwarden/server:latest"
     restart: always
+    user: 1001:1001
     environment:
       # Database settings
       DATABASE_URL_FILE: "/run/secrets/vaultwarden-database-url"
@@ -24,20 +25,27 @@ services:
     volumes:
       - "/mnt/oraclevdb/vaultwarden/:/data/"
     secrets:
-      - vaultwarden-database-url
+      - source: vaultwarden-database-url
+        uid: "1001"
+        gid: "1001"
 
   rclone:
     container_name: rclone
     image: "rclone/rclone:latest"
     restart: always
+    user: 1001:1001
     command: serve webdav oos:${oos_config.bucket_name} --addr rclone:9800 --etag-hash auto --htpasswd /run/secrets/htpasswd
     volumes:
       - "/mnt/oraclevdb/rclone/:/data/"
     configs:
       - source: rclone-config
         target: /config/rclone/rclone.conf
+        uid: "1001"
+        gid: "1001"
     secrets:
-      - htpasswd
+      - source: htpasswd
+        uid: "1001"
+        gid: "1001"
 
   robots-txt:
     container_name: robots-txt
@@ -58,6 +66,7 @@ services:
     container_name: gatus
     image: ghcr.io/twin/gatus:latest
     restart: always
+    user: 1001:1001
     depends_on:
       - vaultwarden
       - rclone
@@ -78,6 +87,8 @@ services:
     configs:
       - source: gatus-config
         target: /config/config.yaml
+        uid: "1001"
+        gid: "1001"
 
   cloudflared:
     container_name: cloudflared

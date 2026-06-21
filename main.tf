@@ -360,6 +360,7 @@ resource "oci_core_instance" "main" {
                 content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
                 # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
                 permissions = "0440",
+                owner       = "jeremy:jeremy",
               },
               {
                 path = "/home/jeremy/vaultwarden-database-url",
