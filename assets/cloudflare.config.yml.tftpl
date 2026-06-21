@@ -1,0 +1,24 @@
+tunnel: ${cloudflared_tunnel_id}
+credentials-file: /run/secrets/${cloudflared_tunnel_id}.json
+
+warp-routing:
+  enabled: true
+
+# tunnel run parameters
+edge-ip-version: auto
+region: us
+
+ingress:
+  %{~ for subdomain in ["vault.", "webdav.", "status.", "freshrss", ""] ~}
+  - hostname: ${subdomain}${server_domain}/robots.txt
+    service: http://robots-txt:8008
+  %{~ endfor ~}
+  - hostname: vault.${server_domain}
+    service: http://vaultwarden:80
+  - hostname: webdav.${server_domain}
+    service: http://rclone:9800
+  - hostname: status.${server_domain}
+    service: http://gatus:8080
+  - hostname: freshrss.${server_domain}
+    service: http://freshrss:80
+  - service: http_status:404

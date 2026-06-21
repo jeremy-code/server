@@ -34,7 +34,7 @@ services:
     image: "rclone/rclone:latest"
     restart: always
     user: 1001:1001
-    command: serve webdav oos:${oos_config.bucket_name} --addr rclone:9800 --etag-hash auto --htpasswd /run/secrets/htpasswd
+    command: serve webdav oos:${bucket_name} --addr rclone:9800 --etag-hash auto --htpasswd /run/secrets/htpasswd
     volumes:
       - "/mnt/oraclevdb/rclone/:/data/"
     configs:
@@ -163,19 +163,7 @@ services:
 
 configs:
   rclone-config:
-    content: |
-      [oos]
-      # https://rclone.org/oracleobjectstorage/
-      type = oracleobjectstorage
-      provider = instance_principal_auth
-      namespace = ${oos_config.namespace}
-      compartment = ${oos_config.compartment_id}
-      region = ${oos_config.region}
-      storage_tier = ${oos_config.bucket_storage_tier}
-      leave_parts_on_error = true
-      attempt_resume_upload = true
-      no_check_bucket = true
-      description = "Remote provider for Oracle Object Storage buckets using instance principals authentication"
+    file: ./rclone.conf
   httpd-conf:
     # https://git.busybox.net/busybox/tree/networking/httpd.c
     content: I:robots.txt
@@ -188,49 +176,9 @@ configs:
   opml-xml:
     file: ./opml.xml
   cloudflared-config:
-    content: |
-      tunnel: ${cloudflared_tunnel_id}
-      credentials-file: /run/secrets/${cloudflared_tunnel_id}.json
-
-      warp-routing:
-        enabled: true
-
-      # tunnel run parameters
-      edge-ip-version: auto
-      region: us
-
-      ingress:
-        %{~ for subdomain in ["vault.", "webdav.", "status.", "freshrss", ""] ~}
-        - hostname: ${subdomain}${server_domain}/robots.txt
-          service: http://robots-txt:8008
-        %{~ endfor ~}
-        - hostname: vault.${server_domain}
-          service: http://vaultwarden:80
-        - hostname: webdav.${server_domain}
-          service: http://rclone:9800
-        - hostname: status.${server_domain}
-          service: http://gatus:8080
-        - hostname: freshrss.${server_domain}
-          service: http://freshrss:80
-        - service: http_status:404
+    file: ./cloudflare.config.yml
   fah-config:
-    content: |
-      <config>
-        <!-- Account -->
-        <account-token v='${fah_config.token}'/>
-        <machine-name value='oracle-cloud'/>
-
-        <!-- Logging -->
-        <verbosity v='6'/>
-
-        <!-- Resource settings -->
-        <cpus v='2'/>
-
-        <!-- User information -->
-        <passkey v='${fah_config.passkey}'/>
-        <team v='${fah_config.team}'/>
-        <user v='${fah_config.user}'/>
-      </config>
+    file: ./fah.config.xml
 
 secrets:
   vaultwarden-database-url:

@@ -389,9 +389,8 @@ resource "oci_core_instance" "main" {
                 }),
               },
               {
-                path = "/home/jeremy/docker-compose.yml",
-                content = templatefile("${path.module}/assets/docker-compose.yml.tftpl", {
-                  server_domain = var.server_domain
+                path = "/home/jeremy/rclone.conf",
+                content = templatefile("${path.module}/assets/rclone.conf.tftpl", {
                   oos_config = {
                     bucket_name         = oci_objectstorage_bucket.main.name
                     region              = var.region
@@ -399,20 +398,39 @@ resource "oci_core_instance" "main" {
                     compartment_id      = oci_identity_compartment.main.id
                     bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
                   }
+                })
+              },
+              {
+                path = "/home/jeremy/fah.config.xml",
+                content = templatefile("${path.module}/assets/fah.config.xml.tftpl", {
+                  fah_config = var.fah_config
+                })
+              },
+              {
+                path = "/home/jeremy/cloudflare.config.yml",
+                content = templatefile("${path.module}/assets/cloudflare.config.yml.tftpl", {
+                  server_domain         = var.server_domain
+                  cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
+                })
+              },
+              {
+                path = "/home/jeremy/docker-compose.yml",
+                content = templatefile("${path.module}/assets/docker-compose.yml.tftpl", {
+                  server_domain = var.server_domain
+                  bucket_name   = oci_objectstorage_bucket.main.name
                   gatus_config = {
                     username                = var.gatus_config.username
                     encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
                   }
-                  cloudflared_tunnel_id = var.cloudflared_config.tunnel_id,
-                  fah_config            = var.fah_config,
+                  cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
                   smtp_config = {
-                    username = oci_identity_smtp_credential.main.username,
-                    password = oci_identity_smtp_credential.main.password,
-                    host     = "smtp.email.${var.region}.oci.oraclecloud.com",
+                    username = oci_identity_smtp_credential.main.username
+                    password = oci_identity_smtp_credential.main.password
+                    host     = "smtp.email.${var.region}.oci.oraclecloud.com"
                   }
                   email = {
-                    vaultwarden = oci_email_sender.vaultwarden.email_address,
-                    gatus       = oci_email_sender.gatus.email_address,
+                    vaultwarden = oci_email_sender.vaultwarden.email_address
+                    gatus       = oci_email_sender.gatus.email_address
                     owner       = var.email_address
                   }
                 })

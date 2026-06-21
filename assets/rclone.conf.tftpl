@@ -1,0 +1,12 @@
+[oos]
+# https://rclone.org/oracleobjectstorage/
+type = oracleobjectstorage
+provider = instance_principal_auth
+namespace = ${oos_config.namespace}
+compartment = ${oos_config.compartment_id}
+region = ${oos_config.region}
+storage_tier = ${oos_config.bucket_storage_tier}
+leave_parts_on_error = true
+attempt_resume_upload = true
+no_check_bucket = true
+description = "Remote provider for Oracle Object Storage buckets using instance principals authentication"
