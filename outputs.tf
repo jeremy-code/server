@@ -39,14 +39,31 @@ output "database_subnet" {
   }
 }
 
+data "oci_core_boot_volume" "instance" {
+  boot_volume_id = oci_core_instance.main.boot_volume_id
+}
+
 output "volumes" {
-  value = [oci_core_instance.main.boot_volume_id, oci_core_volume.block.id]
+  value = {
+    for volume in [data.oci_core_boot_volume.instance, oci_core_volume.block] : volume.id =>
+    {
+      display_name           = volume.display_name
+      size_in_gbs            = volume.size_in_gbs
+      state                  = volume.state
+      is_hydrated            = volume.is_hydrated
+      vpus_per_gb            = volume.vpus_per_gb
+      auto_tuned_vpus_per_gb = volume.auto_tuned_vpus_per_gb
+    }
+  }
 }
 
 output "instance" {
   value = {
-    private_ip = oci_core_instance.main.private_ip
-    public_ip  = oci_core_instance.main.public_ip
+    id           = oci_core_instance.main.id
+    display_name = oci_core_instance.main.display_name
+    private_ip   = oci_core_instance.main.private_ip
+    public_ip    = oci_core_instance.main.public_ip
+    region       = oci_core_instance.main.region
     shape = {
       shape                        = oci_core_instance.main.shape
       baseline_ocpu_utilization    = oci_core_instance.main.shape_config[0].baseline_ocpu_utilization
@@ -61,5 +78,24 @@ output "instance" {
       boot_volume_vpus_per_gb = oci_core_instance.main.source_details[0].boot_volume_vpus_per_gb
       source_type             = oci_core_instance.main.source_details[0].source_type
     }
+  }
+}
+
+output "bucket" {
+  value = {
+    id                = oci_objectstorage_bucket.main.bucket_id
+    name              = oci_objectstorage_bucket.main.name
+    access_type       = oci_objectstorage_bucket.main.access_type
+    approximate_count = oci_objectstorage_bucket.main.approximate_count
+    approximate_size  = oci_objectstorage_bucket.main.approximate_size
+    storage_tier      = oci_objectstorage_bucket.main.storage_tier
+  }
+}
+
+output "smtp-credential" {
+  value = {
+    id       = oci_identity_smtp_credential.main.id
+    username = oci_identity_smtp_credential.main.username
+    password = oci_identity_smtp_credential.main.password
   }
 }

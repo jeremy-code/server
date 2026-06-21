@@ -61,7 +61,7 @@ data "oci_core_image" "main" {
 }
 
 resource "oci_core_vcn" "main" {
-  cidr_blocks    = ["192.168.0.0/16"] # RFC 1918
+  cidr_blocks    = ["192.168.0.0/16"] # RFC 1918 (https://datatracker.ietf.org/doc/html/rfc1918#section-3)
   compartment_id = oci_identity_compartment.main.id
   display_name   = "Main Virtual Cloud Network (VCN)"
   dns_label      = "internal"
@@ -168,32 +168,6 @@ resource "oci_core_subnet" "database" {
   vcn_id              = oci_core_vcn.main.id
 }
 
-locals {
-  enabled_plugin_names = [
-    "Vulnerability Scanning",
-    "Cloud Guard Workload Protection",
-    "Block Volume Management",
-  ]
-  disabled_plugin_names = [
-    "Bastion",
-    "Management Agent",
-    "Oracle Autonomous Linux",
-    "OS Management Service Agent",
-    "Custom Logs Monitoring",
-    "Compute Instance Run Command",
-  ]
-
-  plugins_config = concat(
-    [for plugin_name in local.enabled_plugin_names : {
-      desired_state = "ENABLED"
-      name          = plugin_name
-    }],
-    [for plugin_name in local.disabled_plugin_names : {
-      desired_state = "DISABLED"
-      name          = plugin_name
-  }])
-}
-
 resource "oci_mysql_mysql_db_system" "main" {
   admin_username      = "admin"
   admin_password      = base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)
@@ -241,20 +215,25 @@ data "oci_objectstorage_namespace" "main" {
 
 resource "oci_objectstorage_bucket" "main" {
   access_type    = "NoPublicAccess"
+  auto_tiering   = "InfrequentAccess"
   compartment_id = oci_identity_compartment.main.id
   name           = "main-bucket"
   namespace      = data.oci_objectstorage_namespace.main.namespace
   storage_tier   = "Standard"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "oci_email_email_domain" "main" {
+  name           = var.server_domain
   compartment_id = oci_identity_compartment.main.id
-  name           = "jerm.sh"
   description    = "Email domain for home server."
 }
 
 resource "oci_email_email_return_path" "main" {
-  name               = "mail.jerm.sh"
+  name               = format("mail.%s", var.server_domain)
   description        = "Custom return path (bounce address) for domain mail.jerm.sh"
   parent_resource_id = oci_email_email_domain.main.id
 }
@@ -266,12 +245,38 @@ resource "oci_identity_smtp_credential" "main" {
 
 resource "oci_email_sender" "vaultwarden" {
   compartment_id = oci_identity_compartment.main.id
-  email_address  = "vault@jerm.sh"
+  email_address  = format("vault@%s", var.server_domain)
 }
 
 resource "oci_email_sender" "gatus" {
   compartment_id = oci_identity_compartment.main.id
-  email_address  = "status@jerm.sh"
+  email_address  = format("status@%s", var.server_domain)
+}
+
+locals {
+  enabled_plugin_names = [
+    "Vulnerability Scanning",
+    "Cloud Guard Workload Protection",
+    "Block Volume Management",
+  ]
+  disabled_plugin_names = [
+    "Bastion",
+    "Management Agent",
+    "Oracle Autonomous Linux",
+    "OS Management Service Agent",
+    "Custom Logs Monitoring",
+    "Compute Instance Run Command",
+  ]
+
+  plugins_config = concat(
+    [for plugin_name in local.enabled_plugin_names : {
+      desired_state = "ENABLED"
+      name          = plugin_name
+    }],
+    [for plugin_name in local.disabled_plugin_names : {
+      desired_state = "DISABLED"
+      name          = plugin_name
+  }])
 }
 
 locals {
@@ -497,6 +502,10 @@ resource "oci_core_volume" "block" {
   display_name        = "Main Instance Block Volume"
   size_in_gbs         = 50
   vpus_per_gb         = 0
+
+  autotune_policies {
+    autotune_type = "DETACHED_VOLUME"
+  }
 }
 
 data "oci_core_volume_backup_policies" "oracle_defined" {
