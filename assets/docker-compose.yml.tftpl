@@ -34,7 +34,7 @@ services:
     image: "rclone/rclone:latest"
     restart: always
     user: 1001:1001
-    command: serve webdav oos:${bucket_name} --addr rclone:9800 --etag-hash auto --htpasswd /run/secrets/htpasswd
+    command: serve webdav oos:${bucket_name} --addr rclone:9800 --etag-hash auto --gid 1001 --htpasswd /run/secrets/htpasswd --uid 1001
     volumes:
       - "/mnt/oraclevdb/rclone/:/data/"
     configs:
@@ -98,6 +98,7 @@ services:
       - rclone
       - robots-txt
       - gatus
+      - freshrss
     restart: always
     volumes:
       - "/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/"
