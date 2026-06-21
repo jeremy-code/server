@@ -274,6 +274,143 @@ resource "oci_email_sender" "gatus" {
   email_address  = "status@jerm.sh"
 }
 
+locals {
+  cloud_init_write_files = [
+    {
+      path    = "/etc/sysctl.d/local.conf",
+      content = <<-EOF
+                # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
+                # Defaults to 212,992 bytes = 208 KiB. Update to 7,864,000 bytes = 7.5 MiB
+                net.core.rmem_max = 7864000
+                net.core.wmem_max = 7864000
+                EOF
+    },
+    {
+      path        = "/etc/environment",
+      owner       = "root:root",
+      permissions = "0644",
+      append      = true,
+      content     = <<-EOF
+                # https://manpages.ubuntu.com/manpages/noble/man8/pam_env.8.html
+
+                # Docker CLI
+                # https://docs.docker.com/reference/cli/docker/#environment-variables
+
+                # Enable Docker Content Trust, which must be set with an
+                # environment variable for `docker compose up`
+                DOCKER_CONTENT_TRUST=1
+
+                # Docker Compose
+                # https://docs.docker.com/compose/how-tos/environment-variables/envvars/
+
+                COMPOSE_FILE=/home/jeremy/docker-compose.yml
+                COMPOSE_REMOVE_ORPHANS=1
+                EOF
+    },
+    {
+      path    = "/home/jeremy/.env",
+      content = <<-EOF
+                FRESHRSS_EMAIL=${var.freshrss_config.email}
+                FRESHRSS_PASSWORD=${var.freshrss_config.password}
+                EOF
+    },
+    {
+      path    = "/home/jeremy/opml.xml",
+      content = file("${path.module}/assets/opml.xml"),
+    },
+    {
+      path    = "/home/jeremy/htpasswd",
+      content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
+      # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
+      permissions = "0440",
+      owner       = "jeremy:jeremy",
+    },
+    {
+      path = "/home/jeremy/vaultwarden-database-url",
+      content = join("", [
+        "mysql://",
+        oci_mysql_mysql_db_system.main.admin_username,
+        ":",
+        urlencode(base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)),
+        "@",
+        oci_mysql_mysql_db_system.main.ip_address,
+        ":",
+        oci_mysql_mysql_db_system.main.port,
+        "/vaultwarden"
+      ]),
+    },
+    {
+      path    = "/home/jeremy/gatus-config.yaml",
+      content = file("${path.module}/assets/gatus-config.yaml"),
+    },
+    {
+      path = "/home/jeremy/cloudflared-credentials-file.json",
+      content = jsonencode({
+        AccountTag   = var.cloudflared_config.account_tag,
+        TunnelID     = var.cloudflared_config.tunnel_id,
+        TunnelSecret = var.cloudflared_config.tunnel_secret
+      }),
+    },
+    {
+      path = "/home/jeremy/rclone.conf",
+      content = templatefile("${path.module}/assets/rclone.conf.tftpl", {
+        oos_config = {
+          bucket_name         = oci_objectstorage_bucket.main.name
+          region              = var.region
+          namespace           = data.oci_objectstorage_namespace.main.namespace
+          compartment_id      = oci_identity_compartment.main.id
+          bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
+        }
+      })
+    },
+    {
+      path = "/home/jeremy/fah.config.xml",
+      content = templatefile("${path.module}/assets/fah.config.xml.tftpl", {
+        fah_config = var.fah_config
+      })
+    },
+    {
+      path = "/home/jeremy/cloudflare.config.yml",
+      content = templatefile("${path.module}/assets/cloudflare.config.yml.tftpl", {
+        server_domain         = var.server_domain
+        cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
+      })
+    },
+    {
+      path = "/home/jeremy/docker-compose.yml",
+      content = templatefile("${path.module}/assets/docker-compose.yml.tftpl", {
+        server_domain = var.server_domain
+        bucket_name   = oci_objectstorage_bucket.main.name
+        gatus_config = {
+          username                = var.gatus_config.username
+          encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
+        }
+        cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
+        smtp_config = {
+          username = oci_identity_smtp_credential.main.username
+          password = oci_identity_smtp_credential.main.password
+          host     = "smtp.email.${var.region}.oci.oraclecloud.com"
+        }
+        email = {
+          vaultwarden = oci_email_sender.vaultwarden.email_address
+          gatus       = oci_email_sender.gatus.email_address
+          owner       = var.email_address
+        }
+      })
+    }
+  ]
+  cloud_init = base64encode(
+    # Append write_files manually
+    format(
+      "%s\n%s",
+      file("${path.module}/assets/cloud-init.yml"),
+      yamlencode({
+        write_files = local.cloud_init_write_files
+      })
+    )
+  )
+}
+
 resource "oci_core_instance" "main" {
   agent_config {
     dynamic "plugins_config" {
@@ -306,139 +443,7 @@ resource "oci_core_instance" "main" {
     remote_data_volume_type             = "PARAVIRTUALIZED"
   }
   metadata = {
-    user_data = base64encode(
-      format(
-        "%s\n%s",
-        file("${path.module}/assets/cloud-init.yml"),
-        yamlencode(
-          {
-            write_files = [
-              {
-                path    = "/etc/sysctl.d/local.conf",
-                content = <<-EOF
-                # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
-                # Defaults to 212,992 bytes = 208 KiB. Update to 7,864,000 bytes = 7.5 MiB
-                net.core.rmem_max = 7864000
-                net.core.wmem_max = 7864000
-                EOF
-              },
-              {
-                path        = "/etc/environment",
-                owner       = "root:root",
-                permissions = "0644",
-                append      = true,
-                content     = <<-EOF
-                # https://manpages.ubuntu.com/manpages/noble/man8/pam_env.8.html
-
-                # Docker CLI
-                # https://docs.docker.com/reference/cli/docker/#environment-variables
-
-                # Enable Docker Content Trust, which must be set with an
-                # environment variable for `docker compose up`
-                DOCKER_CONTENT_TRUST=1
-
-                # Docker Compose
-                # https://docs.docker.com/compose/how-tos/environment-variables/envvars/
-
-                COMPOSE_FILE=/home/jeremy/docker-compose.yml
-                COMPOSE_REMOVE_ORPHANS=1
-                EOF
-              },
-              {
-                path    = "/home/jeremy/.env",
-                content = <<-EOF
-                FRESHRSS_EMAIL=${var.freshrss_config.email}
-                FRESHRSS_PASSWORD=${var.freshrss_config.password}
-                EOF
-              },
-              {
-                path    = "/home/jeremy/opml.xml",
-                content = file("${path.module}/assets/opml.xml"),
-              },
-              {
-                path    = "/home/jeremy/htpasswd",
-                content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
-                # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
-                permissions = "0440",
-                owner       = "jeremy:jeremy",
-              },
-              {
-                path = "/home/jeremy/vaultwarden-database-url",
-                content = join("", [
-                  "mysql://",
-                  oci_mysql_mysql_db_system.main.admin_username,
-                  ":",
-                  urlencode(base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)),
-                  "@",
-                  oci_mysql_mysql_db_system.main.ip_address,
-                  ":",
-                  oci_mysql_mysql_db_system.main.port,
-                  "/vaultwarden"
-                ]),
-              },
-              {
-                path    = "/home/jeremy/gatus-config.yaml",
-                content = file("${path.module}/assets/gatus-config.yaml"),
-              },
-              {
-                path = "/home/jeremy/cloudflared-credentials-file.json",
-                content = jsonencode({
-                  AccountTag   = var.cloudflared_config.account_tag,
-                  TunnelID     = var.cloudflared_config.tunnel_id,
-                  TunnelSecret = var.cloudflared_config.tunnel_secret
-                }),
-              },
-              {
-                path = "/home/jeremy/rclone.conf",
-                content = templatefile("${path.module}/assets/rclone.conf.tftpl", {
-                  oos_config = {
-                    bucket_name         = oci_objectstorage_bucket.main.name
-                    region              = var.region
-                    namespace           = data.oci_objectstorage_namespace.main.namespace
-                    compartment_id      = oci_identity_compartment.main.id
-                    bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
-                  }
-                })
-              },
-              {
-                path = "/home/jeremy/fah.config.xml",
-                content = templatefile("${path.module}/assets/fah.config.xml.tftpl", {
-                  fah_config = var.fah_config
-                })
-              },
-              {
-                path = "/home/jeremy/cloudflare.config.yml",
-                content = templatefile("${path.module}/assets/cloudflare.config.yml.tftpl", {
-                  server_domain         = var.server_domain
-                  cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
-                })
-              },
-              {
-                path = "/home/jeremy/docker-compose.yml",
-                content = templatefile("${path.module}/assets/docker-compose.yml.tftpl", {
-                  server_domain = var.server_domain
-                  bucket_name   = oci_objectstorage_bucket.main.name
-                  gatus_config = {
-                    username                = var.gatus_config.username
-                    encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
-                  }
-                  cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
-                  smtp_config = {
-                    username = oci_identity_smtp_credential.main.username
-                    password = oci_identity_smtp_credential.main.password
-                    host     = "smtp.email.${var.region}.oci.oraclecloud.com"
-                  }
-                  email = {
-                    vaultwarden = oci_email_sender.vaultwarden.email_address
-                    gatus       = oci_email_sender.gatus.email_address
-                    owner       = var.email_address
-                  }
-                })
-              }
-            ]
-          }
-        )
-    ))
+    user_data = local.cloud_init
   }
   shape = data.oci_core_images.main.shape
   shape_config {
