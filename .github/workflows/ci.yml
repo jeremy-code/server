@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read # Access to check out code
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6
+
+      - name: Set up Terraform CLI
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.6
+
+      - name: Initialize Terraform working directory
+        run: terraform init
+
+      - name: Check formatting
+        run: terraform fmt -check
+
+      - name: Validate Terraform configuration
+        run: terraform validate
