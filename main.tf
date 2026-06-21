@@ -321,7 +321,7 @@ locals {
     },
     {
       path    = "/home/jeremy/opml.xml",
-      content = file("${path.module}/assets/opml.xml"),
+      content = file("${path.module}/files/opml.xml"),
     },
     {
       path    = "/home/jeremy/htpasswd",
@@ -346,7 +346,7 @@ locals {
     },
     {
       path    = "/home/jeremy/gatus-config.yaml",
-      content = file("${path.module}/assets/gatus-config.yaml"),
+      content = file("${path.module}/files/gatus-config.yaml"),
     },
     {
       path = "/home/jeremy/cloudflared-credentials-file.json",
@@ -358,7 +358,7 @@ locals {
     },
     {
       path = "/home/jeremy/rclone.conf",
-      content = templatefile("${path.module}/assets/rclone.conf.tftpl", {
+      content = templatefile("${path.module}/templates/rclone.conf.tftpl", {
         oos_config = {
           bucket_name         = oci_objectstorage_bucket.main.name
           region              = var.region
@@ -370,20 +370,20 @@ locals {
     },
     {
       path = "/home/jeremy/fah.config.xml",
-      content = templatefile("${path.module}/assets/fah.config.xml.tftpl", {
+      content = templatefile("${path.module}/templates/fah.config.xml.tftpl", {
         fah_config = var.fah_config
       })
     },
     {
       path = "/home/jeremy/cloudflare.config.yml",
-      content = templatefile("${path.module}/assets/cloudflare.config.yml.tftpl", {
+      content = templatefile("${path.module}/templates/cloudflare.config.yml.tftpl", {
         server_domain         = var.server_domain
         cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
       })
     },
     {
       path = "/home/jeremy/docker-compose.yml",
-      content = templatefile("${path.module}/assets/docker-compose.yml.tftpl", {
+      content = templatefile("${path.module}/templates/docker-compose.yml.tftpl", {
         server_domain = var.server_domain
         bucket_name   = oci_objectstorage_bucket.main.name
         gatus_config = {
@@ -408,7 +408,7 @@ locals {
     # Append write_files manually
     format(
       "%s\n%s",
-      file("${path.module}/assets/cloud-init.yml"),
+      file("${path.module}/files/cloud-init.yml"),
       yamlencode({
         write_files = local.cloud_init_write_files
       })
