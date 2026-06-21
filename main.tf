@@ -170,7 +170,7 @@ resource "oci_core_subnet" "database" {
 
 resource "oci_mysql_mysql_db_system" "main" {
   admin_username      = "admin"
-  admin_password      = base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)
+  admin_password      = base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content[0].content)
   availability_domain = data.oci_identity_availability_domain.main.name
   compartment_id      = oci_identity_compartment.main.id
   crash_recovery      = "ENABLED"
@@ -336,7 +336,7 @@ locals {
         "mysql://",
         oci_mysql_mysql_db_system.main.admin_username,
         ":",
-        urlencode(base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content.0.content)),
+        urlencode(base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content[0].content)),
         "@",
         oci_mysql_mysql_db_system.main.ip_address,
         ":",
