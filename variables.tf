@@ -30,7 +30,10 @@ variable "user_ocid" {
 
 /**
  * The following permissions are needed:
+ * Account
  *   - Cloudflare Tunnel (Edit)
+ * Zone
+ *   - DNS (Edit)
  */
 variable "cloudflare_api_token" {
   type        = string

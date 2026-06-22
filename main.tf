@@ -251,6 +251,10 @@ resource "oci_email_email_domain" "main" {
   description    = "Email domain for home server."
 }
 
+data "oci_email_dkim" "main" {
+  dkim_id = oci_email_email_domain.main.active_dkim_id
+}
+
 resource "oci_email_email_return_path" "main" {
   name               = "mail.${var.server_domain}"
   description        = "Custom return path (bounce address) for domain mail.${var.server_domain}"
