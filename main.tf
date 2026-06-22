@@ -48,6 +48,25 @@ data "oci_secrets_secretbundle" "mysql_db_password" {
   secret_id = oci_vault_secret.mysql_db_password.id
 }
 
+resource "oci_vault_secret" "cloudflare_tunnel_secret" {
+  compartment_id = oci_identity_compartment.main.id
+  key_id         = oci_kms_key.main.id
+  secret_name    = "cloudflare_tunnel_secret"
+  vault_id       = oci_kms_vault.main.id
+  description    = "Cloudflare tunnel secret"
+}
+
+data "oci_secrets_secretbundle" "cloudflare_tunnel_secret" {
+  secret_id = oci_vault_secret.cloudflare_tunnel_secret.id
+}
+
+resource "cloudflare_zero_trust_tunnel_cloudflared" "main" {
+  account_id    = var.cloudflare_account_id
+  name          = "*.${var.server_domain}"
+  config_src    = "cloudflare"
+  tunnel_secret = data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[0].content
+}
+
 data "oci_core_images" "main" {
   compartment_id = oci_identity_compartment.main.id
   # https://docs.oracle.com/en-us/iaas/images/ubuntu-2404/index.htm
@@ -353,9 +372,9 @@ locals {
     {
       path = "/home/jeremy/cloudflared-credentials-file.json",
       content = jsonencode({
-        AccountTag   = var.cloudflared_config.account_tag,
-        TunnelID     = var.cloudflared_config.tunnel_id,
-        TunnelSecret = var.cloudflared_config.tunnel_secret
+        AccountTag   = cloudflare_zero_trust_tunnel_cloudflared.main.account_tag
+        TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.main.id
+        TunnelSecret = data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[0].content
       }),
     },
     {
@@ -380,7 +399,7 @@ locals {
       path = "/home/jeremy/cloudflare.config.yml",
       content = templatefile("${path.module}/templates/cloudflare.config.yml.tftpl", {
         server_domain         = var.server_domain
-        cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
+        cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
       })
     },
     {
@@ -392,7 +411,7 @@ locals {
           username                = var.gatus_config.username
           encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
         }
-        cloudflared_tunnel_id = var.cloudflared_config.tunnel_id
+        cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
         smtp_config = {
           username = oci_identity_smtp_credential.main.username
           password = oci_identity_smtp_credential.main.password

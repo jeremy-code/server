@@ -92,7 +92,7 @@ output "bucket" {
   }
 }
 
-output "smtp-credential" {
+output "smtp_credential" {
   value = {
     id       = oci_identity_smtp_credential.main.id
     username = oci_identity_smtp_credential.main.username

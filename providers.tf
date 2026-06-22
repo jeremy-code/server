@@ -5,3 +5,7 @@ provider "oci" {
   auth                = "SecurityToken"
   config_file_profile = "DEFAULT"
 }
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
+}

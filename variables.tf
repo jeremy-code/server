@@ -28,6 +28,25 @@ variable "user_ocid" {
   }
 }
 
+/**
+ * The following permissions are needed:
+ *   - Cloudflare Tunnel (Edit)
+ */
+variable "cloudflare_api_token" {
+  type        = string
+  description = "Cloudflare API token"
+
+  validation {
+    condition     = startswith(var.cloudflare_api_token, "cfut_")
+    error_message = "The Cloudflare API token must be valid"
+  }
+}
+
+variable "cloudflare_account_id" {
+  type        = string
+  description = "Cloudflare API token"
+}
+
 variable "server_domain" {
   type        = string
   description = "The domain name for the server"
@@ -72,20 +91,6 @@ variable "gatus_config" {
     password = string
   })
   description = "The credentials for Gatus basic authentication"
-}
-
-variable "cloudflared_config" {
-  type = object({
-    account_tag   = string
-    tunnel_id     = string
-    tunnel_secret = string
-  })
-  description = "The configuration for cloudflared"
-
-  validation {
-    condition     = can(base64decode(var.cloudflared_config.tunnel_secret)) && length(base64decode(var.cloudflared_config.tunnel_secret)) >= 32
-    error_message = "The tunnel secret must be a Base64-encoded string of at least 32 bytes"
-  }
 }
 
 variable "fah_config" {

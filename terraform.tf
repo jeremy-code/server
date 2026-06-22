@@ -5,5 +5,9 @@ terraform {
       source  = "oracle/oci"
       version = "~> 8.19"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.21"
+    }
   }
 }
