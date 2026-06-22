@@ -1,7 +1,7 @@
 resource "oci_identity_compartment" "main" {
   compartment_id = var.tenancy_ocid
   description    = "Compartment for home server."
-  name           = "server-compartment"
+  name           = "server_compartment"
 }
 
 data "oci_identity_availability_domains" "main" {
@@ -503,13 +503,13 @@ resource "oci_identity_dynamic_group" "instance" {
   compartment_id = var.tenancy_ocid
   description    = "Dynamic group for the main instance."
   matching_rule  = "instance.id = '${oci_core_instance.main.id}'"
-  name           = "main-instance-dynamic-group"
+  name           = "main_instance_dynamic_group"
 }
 
-resource "oci_identity_policy" "instance-policy" {
+resource "oci_identity_policy" "instance" {
   compartment_id = oci_identity_compartment.main.id
   description    = "Allow storage bucket read/write access to the main instance."
-  name           = "main-instance-policy"
+  name           = "main_instance_policy"
   # https://docs.oracle.com/en-us/iaas/Content/Identity/Reference/objectstoragepolicyreference.htm
   statements = [
     "Allow dynamic-group '${oci_identity_dynamic_group.instance.name}' to manage objectstorage-namespaces in compartment ${oci_identity_compartment.main.name}",
