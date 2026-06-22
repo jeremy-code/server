@@ -266,14 +266,11 @@ resource "oci_identity_smtp_credential" "main" {
   description = "Main SMTP credentials"
 }
 
-resource "oci_email_sender" "vaultwarden" {
-  compartment_id = oci_identity_compartment.main.id
-  email_address  = "vault@${var.server_domain}"
-}
+resource "oci_email_sender" "senders" {
+  for_each = toset(["vault", "status"])
 
-resource "oci_email_sender" "gatus" {
   compartment_id = oci_identity_compartment.main.id
-  email_address  = "status@${var.server_domain}"
+  email_address  = "${each.value}@${var.server_domain}"
 }
 
 locals {
@@ -422,8 +419,8 @@ locals {
           host     = "smtp.email.${var.region}.oci.oraclecloud.com"
         }
         email = {
-          vaultwarden = oci_email_sender.vaultwarden.email_address
-          gatus       = oci_email_sender.gatus.email_address
+          vaultwarden = oci_email_sender.senders["vault"].email_address
+          gatus       = oci_email_sender.senders["status"].email_address
           owner       = var.email_address
         }
       })
