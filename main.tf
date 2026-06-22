@@ -29,23 +29,23 @@ resource "oci_kms_key" "main" {
   }
 }
 
-resource "oci_vault_secret" "mysql-db-password" {
+resource "oci_vault_secret" "mysql_db_password" {
   compartment_id         = oci_identity_compartment.main.id
   key_id                 = oci_kms_key.main.id
-  secret_name            = "mysql-db-password"
+  secret_name            = "mysql_db_password"
   vault_id               = oci_kms_vault.main.id
   description            = "MySQL database password"
   enable_auto_generation = true
 
   secret_generation_context {
-    generation_template = "SECRETS_DEFAULT_PASSWORD"
+    generation_template = "DBAAS_DEFAULT_PASSWORD"
     generation_type     = "PASSPHRASE"
     passphrase_length   = 16
   }
 }
 
-data "oci_secrets_secretbundle" "mysql-db-password" {
-  secret_id = oci_vault_secret.mysql-db-password.id
+data "oci_secrets_secretbundle" "mysql_db_password" {
+  secret_id = oci_vault_secret.mysql_db_password.id
 }
 
 data "oci_core_images" "main" {
@@ -170,7 +170,7 @@ resource "oci_core_subnet" "database" {
 
 resource "oci_mysql_mysql_db_system" "main" {
   admin_username      = "admin"
-  admin_password      = base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content[0].content)
+  admin_password      = base64decode(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[0].content)
   availability_domain = data.oci_identity_availability_domain.main.name
   compartment_id      = oci_identity_compartment.main.id
   crash_recovery      = "ENABLED"
@@ -329,6 +329,8 @@ locals {
       # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
       permissions = "0440",
       owner       = "jeremy:jeremy",
+      # Wait until user is created
+      defer = true,
     },
     {
       path = "/home/jeremy/vaultwarden-database-url",
@@ -336,7 +338,7 @@ locals {
         "mysql://",
         oci_mysql_mysql_db_system.main.admin_username,
         ":",
-        urlencode(base64decode(data.oci_secrets_secretbundle.mysql-db-password.secret_bundle_content[0].content)),
+        urlencode(base64decode(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[0].content)),
         "@",
         oci_mysql_mysql_db_system.main.ip_address,
         ":",
