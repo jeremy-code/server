@@ -338,6 +338,13 @@ locals {
                 EOF
     },
     {
+      path        = "/etc/logrotate.conf",
+      owner       = "root:root",
+      permissions = "0644",
+      append      = true,
+      content     = file("${path.module}/files/logrotate.conf")
+    },
+    {
       path    = "/home/jeremy/.env",
       content = <<-EOF
                 FRESHRSS_EMAIL=${var.freshrss_config.email}

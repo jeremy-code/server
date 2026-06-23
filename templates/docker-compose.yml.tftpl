@@ -16,6 +16,7 @@ services:
       # Advanced settings
       IP_HEADER: "CF-Connecting-IP" # https://developers.cloudflare.com/fundamentals/reference/http-headers/
       EXPERIMENTAL_CLIENT_FEATURE_FLAGS: "ssh-key-vault-item"
+      LOG_FILE: "/data/logs/vaultwarden.log"
       # SMTP Email settings
       SMTP_HOST: "${smtp_config.host}"
       SMTP_FROM: "${email.vaultwarden}"
