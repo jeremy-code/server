@@ -60,11 +60,16 @@ data "oci_secrets_secretbundle" "cloudflare_tunnel_secret" {
   secret_id = oci_vault_secret.cloudflare_tunnel_secret.id
 }
 
+locals {
+  mysql_db_password        = one(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[*].content)
+  cloudflare_tunnel_secret = one(data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[*].content)
+}
+
 resource "cloudflare_zero_trust_tunnel_cloudflared" "main" {
   account_id    = var.cloudflare_account_id
   name          = "*.${var.server_domain}"
   config_src    = "cloudflare"
-  tunnel_secret = data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[0].content
+  tunnel_secret = local.cloudflare_tunnel_secret
 }
 
 data "oci_core_images" "main" {
@@ -140,7 +145,7 @@ resource "oci_core_route_table" "main" {
 
 resource "oci_core_subnet" "instance" {
   availability_domain = data.oci_identity_availability_domain.main.name
-  cidr_block          = local.instance_subnet_cidr_blocks[0]
+  cidr_block          = one(local.instance_subnet_cidr_blocks)
   compartment_id      = oci_identity_compartment.main.id
   display_name        = "Main Compute Instance Subnet"
   dns_label           = "instance"
@@ -179,7 +184,7 @@ resource "oci_core_security_list" "database" {
 
 resource "oci_core_subnet" "database" {
   availability_domain = data.oci_identity_availability_domain.main.name
-  cidr_block          = local.database_subnet_cidr_blocks[0]
+  cidr_block          = one(local.database_subnet_cidr_blocks)
   compartment_id      = oci_identity_compartment.main.id
   display_name        = "Main MySQL Database System Subnet"
   dns_label           = "database"
@@ -189,7 +194,7 @@ resource "oci_core_subnet" "database" {
 
 resource "oci_mysql_mysql_db_system" "main" {
   admin_username      = "admin"
-  admin_password      = base64decode(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[0].content)
+  admin_password      = base64decode(local.mysql_db_password)
   availability_domain = data.oci_identity_availability_domain.main.name
   compartment_id      = oci_identity_compartment.main.id
   crash_recovery      = "ENABLED"
@@ -358,7 +363,7 @@ locals {
         "mysql://",
         oci_mysql_mysql_db_system.main.admin_username,
         ":",
-        urlencode(base64decode(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[0].content)),
+        urlencode(base64decode(local.mysql_db_password)),
         "@",
         oci_mysql_mysql_db_system.main.ip_address,
         ":",
@@ -375,7 +380,7 @@ locals {
       content = jsonencode({
         AccountTag   = cloudflare_zero_trust_tunnel_cloudflared.main.account_tag
         TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.main.id
-        TunnelSecret = data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[0].content
+        TunnelSecret = local.cloudflare_tunnel_secret
       }),
     },
     {
