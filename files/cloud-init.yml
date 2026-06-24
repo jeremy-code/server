@@ -23,6 +23,11 @@ apt:
       # Equivalent to `gpg --keyserver https://download.docker.com/linux/ubuntu/gpg --receive-keys [keyid]`
       keyserver: "https://download.docker.com/linux/ubuntu/gpg"
 
+keyboard:
+  layout: us
+
+locale: en_US
+
 mounts:
   - [
       /dev/oracleoci/oraclevdb,
@@ -61,8 +66,11 @@ runcmd:
 ssh_import_id:
   - "gh:jeremy-code"
 
-timezone: "America/Los_Angeles"
+timezone: "America/Phoenix"
 
+# This only updates the default user. Since /etc/cloud/cloud.cfg.d lists a
+# default user and the opc user (which has ssh disabled). Since opc is created
+# first, this user has uid/gid 1001.
 user:
   name: "jeremy"
   gecos: "Jeremy Nguyen,,,"
