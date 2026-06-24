@@ -18,11 +18,11 @@ services:
       EXPERIMENTAL_CLIENT_FEATURE_FLAGS: "ssh-key-vault-item"
       LOG_FILE: "/data/logs/vaultwarden.log"
       # SMTP Email settings
-      SMTP_HOST: "${smtp_config.host}"
+      SMTP_HOST: "$${SMTP_HOST}"
       SMTP_FROM: "${email.vaultwarden}"
       SMTP_FROM_NAME: "Vaultwarden"
-      SMTP_USERNAME: "${smtp_config.username}"
-      SMTP_PASSWORD: "${smtp_config.password}"
+      SMTP_USERNAME: "$${SMTP_PASSWORD}"
+      SMTP_PASSWORD: "$${SMTP_PASSWORD}"
     volumes:
       - "/mnt/oraclevdb/vaultwarden/:/data/"
     secrets:
@@ -80,9 +80,9 @@ services:
       SERVER_DOMAIN: "${server_domain}"
       EMAIL_FROM: "${email.gatus}"
       EMAIL_TO: "${email.owner}"
-      SMTP_HOST: "${smtp_config.host}"
-      SMTP_USERNAME: "${smtp_config.username}"
-      SMTP_PASSWORD: "${smtp_config.password}"
+      SMTP_HOST: "$${SMPT_HOST}"
+      SMTP_USERNAME: "$${SMTP_USERNAME}"
+      SMTP_PASSWORD: "$${SMTP_PASSWORD}"
     volumes:
       - "/mnt/oraclevdb/gatus/:/data/"
     configs:

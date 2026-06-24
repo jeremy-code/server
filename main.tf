@@ -345,11 +345,15 @@ locals {
       content     = file("${path.module}/files/logrotate.conf")
     },
     {
-      path    = "/home/jeremy/.env",
-      content = <<-EOF
-                FRESHRSS_EMAIL=${var.freshrss_config.email}
-                FRESHRSS_PASSWORD=${var.freshrss_config.password}
-                EOF
+      path = "/home/jeremy/.env",
+      content = templatefile("${path.module}/templates/.env.tftpl", {
+        freshrss_config = var.freshrss_config
+        smtp_config = {
+          username = oci_identity_smtp_credential.main.username
+          password = oci_identity_smtp_credential.main.password
+          host     = "smtp.email.${var.region}.oci.oraclecloud.com"
+        }
+      })
     },
     {
       path    = "/home/jeremy/opml.xml",
@@ -425,11 +429,6 @@ locals {
           encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
         }
         cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
-        smtp_config = {
-          username = oci_identity_smtp_credential.main.username
-          password = oci_identity_smtp_credential.main.password
-          host     = "smtp.email.${var.region}.oci.oraclecloud.com"
-        }
         email = {
           vaultwarden = oci_email_sender.senders["vault"].email_address
           gatus       = oci_email_sender.senders["status"].email_address
