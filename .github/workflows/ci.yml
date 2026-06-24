@@ -31,3 +31,18 @@ jobs:
 
       - name: Validate Terraform configuration
         run: terraform validate
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.63.1
+          github_token: ${{ github.token }}
+
+      - name: Init TFLint
+        run: tflint --init
+        env:
+          # https://github.com/terraform-linters/tflint/blob/master/docs/user-guide/plugins.md#avoiding-rate-limiting
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Lint with TFLint
+        run: tflint
