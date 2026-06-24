@@ -307,6 +307,18 @@ locals {
 locals {
   cloud_init_write_files = [
     {
+      path        = "/etc/ssh/sshd_config.d/99-google-authenticator.conf",
+      content     = file("${path.module}/files/99-google-authenticator.conf"),
+      owner       = "root:root",
+      permissions = "0644",
+    },
+    {
+      path        = "/etc/pam.d/sshd",
+      content     = file("${path.module}/files/sshd"),
+      owner       = "root:root",
+      permissions = "0644",
+    },
+    {
       path    = "/etc/sysctl.d/local.conf",
       content = <<-EOF
                 # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
@@ -506,7 +518,7 @@ resource "oci_core_instance" "main" {
       # ignored. When the metadata actually changes, run `terraform plan` or
       # `terraform apply` with `-replace="oci_core_instance.main"` to force
       # replacement (or comment out this line).
-      metadata
+      # metadata
     ]
   }
 }
