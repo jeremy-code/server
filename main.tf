@@ -61,8 +61,81 @@ data "oci_secrets_secretbundle" "cloudflare_tunnel_secret" {
 }
 
 locals {
-  mysql_db_password        = one(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[*].content)
-  cloudflare_tunnel_secret = one(data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[*].content)
+  auth_clients = ["gatus", "vaultwarden", "freshrss"]
+}
+
+resource "oci_vault_secret" "auth_client_secrets" {
+  for_each = toset(local.auth_clients)
+
+  compartment_id         = oci_identity_compartment.main.id
+  key_id                 = oci_kms_key.main.id
+  secret_name            = "client_secret_${each.key}"
+  vault_id               = oci_kms_vault.main.id
+  description            = "Authentication encryption key for ${each.key}"
+  enable_auto_generation = true
+
+  secret_generation_context {
+    generation_template = "SECRETS_DEFAULT_PASSWORD"
+    generation_type     = "PASSPHRASE"
+    passphrase_length   = 16
+  }
+}
+
+data "oci_secrets_secretbundle" "auth_client_secrets" {
+  for_each  = toset(local.auth_clients)
+  secret_id = oci_vault_secret.auth_client_secrets[each.key].id
+}
+
+resource "oci_vault_secret" "authelia_oidc_signing_key" {
+  compartment_id         = oci_identity_compartment.main.id
+  description            = "Authelia OIDC signing key"
+  enable_auto_generation = true
+  key_id                 = oci_kms_key.main.id
+  secret_name            = "authelia_oidc_signing_key"
+  vault_id               = oci_kms_vault.main.id
+
+  secret_generation_context {
+    generation_template = "RSA_4096"
+    generation_type     = "SSH_KEY"
+  }
+}
+
+data "oci_secrets_secretbundle" "authelia_oidc_signing_key" {
+  secret_id = oci_vault_secret.authelia_oidc_signing_key.id
+}
+
+locals {
+  authelia_secrets = ["hmac_secret", "jwt_secret", "session_secret", "storage_encryption_key"]
+}
+
+resource "oci_vault_secret" "authelia" {
+  for_each = toset(local.authelia_secrets)
+
+  compartment_id         = oci_identity_compartment.main.id
+  description            = "Authelia secret for ${each.key}"
+  enable_auto_generation = true
+  key_id                 = oci_kms_key.main.id
+  secret_name            = "authelia_${each.key}"
+  vault_id               = oci_kms_vault.main.id
+
+  secret_generation_context {
+    generation_template = "SECRETS_DEFAULT_PASSWORD"
+    generation_type     = "PASSPHRASE"
+    passphrase_length   = 21
+  }
+}
+
+data "oci_secrets_secretbundle" "authelia" {
+  for_each  = toset(local.authelia_secrets)
+  secret_id = oci_vault_secret.authelia[each.key].id
+}
+
+locals {
+  mysql_db_password         = one(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[*].content)
+  cloudflare_tunnel_secret  = one(data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[*].content)
+  auth_client_secrets       = zipmap(local.auth_clients, [for client in local.auth_clients : one(data.oci_secrets_secretbundle.auth_client_secrets[client].secret_bundle_content[*].content)])
+  authelia                  = zipmap(local.authelia_secrets, [for client in local.authelia_secrets : one(data.oci_secrets_secretbundle.authelia[client].secret_bundle_content[*].content)])
+  authelia_oidc_signing_key = jsondecode(base64decode(one(data.oci_secrets_secretbundle.authelia_oidc_signing_key.secret_bundle_content[*].content)))
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "main" {
@@ -202,7 +275,7 @@ resource "oci_mysql_mysql_db_system" "main" {
     is_auto_expand_storage_enabled = false
   }
   customer_contacts {
-    email = var.email_address
+    email = var.user_config.email_address
   }
   data_storage_size_in_gb = 50
   database_management     = "DISABLED"
@@ -272,7 +345,7 @@ resource "oci_identity_smtp_credential" "main" {
 }
 
 resource "oci_email_sender" "senders" {
-  for_each = toset(["vault", "status"])
+  for_each = toset(["vault", "status", "auth"])
 
   compartment_id = oci_identity_compartment.main.id
   email_address  = "${each.value}@${var.server_domain}"
@@ -304,6 +377,17 @@ locals {
   }])
 }
 
+resource "random_uuid4" "auth_client_ids" {
+  for_each = toset(local.auth_clients)
+}
+
+locals {
+  auth_client_ids = zipmap(local.auth_clients, [for client in local.auth_clients : (random_uuid4.auth_client_ids[client].id)])
+}
+
+# Using encoding = "gzip+base64" and base64gzip function to compress and encode
+# files to reduce metadata size since the maximum metadata size is 32,000 bytes
+# (32kB). For more information, see oracle/terraform-provider-oci#635.
 locals {
   cloud_init_write_files = [
     {
@@ -347,7 +431,6 @@ locals {
     {
       path = "/home/jeremy/.env",
       content = templatefile("${path.module}/templates/.env.tftpl", {
-        freshrss_config = var.freshrss_config
         smtp_config = {
           username = oci_identity_smtp_credential.main.username
           password = oci_identity_smtp_credential.main.password
@@ -360,6 +443,38 @@ locals {
       content = file("${path.module}/files/opml.xml"),
     },
     {
+      encoding = "gzip+base64"
+      path     = "/home/jeremy/authelia-oidc-signing-key"
+      content  = base64gzip(local.authelia_oidc_signing_key.privateKey)
+    },
+    {
+      encoding = "gzip+base64"
+      path     = "/home/jeremy/authelia.configuration.yml",
+      content  = base64gzip(file("${path.module}/files/authelia.configuration.yml")),
+    },
+    { path = "/home/jeremy/users_database.yml",
+      content = templatefile("${path.module}/templates/users_database.yml.tftpl", {
+        email_address = var.user_config.email_address
+        password      = bcrypt(var.user_config.password, 12)
+      })
+    },
+    {
+      path    = "/home/jeremy/hmac-secret",
+      content = local.authelia.hmac_secret
+    },
+    {
+      path    = "/home/jeremy/jwt-secret",
+      content = local.authelia.jwt_secret
+    },
+    {
+      path    = "/home/jeremy/session-secret",
+      content = local.authelia.session_secret
+    },
+    {
+      path    = "/home/jeremy/storage-encryption-key",
+      content = local.authelia.storage_encryption_key
+    },
+    {
       path    = "/home/jeremy/htpasswd",
       content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
       # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
@@ -367,6 +482,17 @@ locals {
       owner       = "jeremy:jeremy",
       # Wait until user is created
       defer = true,
+    },
+    {
+      path = "/home/jeremy/authelia.env",
+      content = templatefile("${path.module}/templates/authelia.env.tftpl", {
+        auth = {
+          client_ids     = local.auth_client_ids
+          client_secrets = zipmap(keys(local.auth_client_secrets), [for auth_client_secret in values(local.auth_client_secrets) : bcrypt(auth_client_secret, 12)])
+        }
+        server_domain = var.server_domain
+        smtp_from     = oci_email_sender.senders["auth"].email_address
+      })
     },
     {
       path = "/home/jeremy/vaultwarden-database-url",
@@ -383,8 +509,9 @@ locals {
       ]),
     },
     {
-      path    = "/home/jeremy/gatus-config.yaml",
-      content = file("${path.module}/files/gatus-config.yaml"),
+      encoding = "gzip+base64",
+      path     = "/home/jeremy/gatus-config.yaml",
+      content  = base64gzip(file("${path.module}/files/gatus-config.yaml")),
     },
     {
       path = "/home/jeremy/cloudflared-credentials-file.json",
@@ -420,21 +547,23 @@ locals {
       })
     },
     {
-      path = "/home/jeremy/docker-compose.yml",
-      content = templatefile("${path.module}/templates/docker-compose.yml.tftpl", {
-        server_domain = var.server_domain
-        bucket_name   = oci_objectstorage_bucket.main.name
-        gatus_config = {
-          username                = var.gatus_config.username
-          encoded_hashed_password = base64encode(bcrypt(var.gatus_config.password, 9))
-        }
+      encoding = "gzip+base64"
+      path     = "/home/jeremy/docker-compose.yml",
+      content = base64gzip(templatefile("${path.module}/templates/docker-compose.yml.tftpl", {
+        server_domain         = var.server_domain
+        bucket_name           = oci_objectstorage_bucket.main.name
         cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
         email = {
           vaultwarden = oci_email_sender.senders["vault"].email_address
           gatus       = oci_email_sender.senders["status"].email_address
-          owner       = var.email_address
+          auth        = oci_email_sender.senders["auth"].email_address
+          owner       = var.user_config.email_address
         }
-      })
+        auth = {
+          client_ids     = local.auth_client_ids
+          client_secrets = local.auth_client_secrets
+        }
+      }))
     }
   ]
   cloud_init = base64encode(
