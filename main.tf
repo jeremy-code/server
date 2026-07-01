@@ -407,8 +407,9 @@ locals {
       # Configs
       [
         {
-          path    = "/home/jeremy/opml.xml",
-          content = file("${path.module}/files/opml.xml"),
+          encoding = "gzip+base64",
+          path     = "/home/jeremy/opml.xml",
+          content  = base64gzip(file("${path.module}/files/opml.xml")),
         },
         {
           encoding = "gzip+base64"
@@ -416,13 +417,14 @@ locals {
           content  = base64gzip(file("${path.module}/files/authelia.configuration.yml")),
         },
         {
-          path = "/home/jeremy/users_database.yml",
-          content = templatefile("${path.module}/templates/users_database.yml.tftpl", {
+          encoding = "gzip+base64",
+          path     = "/home/jeremy/users_database.yml",
+          content = base64gzip(templatefile("${path.module}/templates/users_database.yml.tftpl", {
             user_config = {
               email_address = var.user_config.email_address
               password      = bcrypt(var.user_config.password, 12)
             }
-          })
+          }))
         },
         {
           encoding = "gzip+base64",
@@ -430,28 +432,31 @@ locals {
           content  = base64gzip(file("${path.module}/files/gatus-config.yaml")),
         },
         {
-          path = "/home/jeremy/rclone.conf",
-          content = templatefile("${path.module}/templates/rclone.conf.tftpl", {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/rclone.conf",
+          content = base64gzip(templatefile("${path.module}/templates/rclone.conf.tftpl", {
             oos_config = {
               region              = var.region
               namespace           = data.oci_objectstorage_namespace.main.namespace
               compartment_id      = oci_identity_compartment.main.id
               bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
             }
-          })
+          }))
         },
         {
-          path = "/home/jeremy/fah.config.xml",
-          content = templatefile("${path.module}/templates/fah.config.xml.tftpl", {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/fah.config.xml",
+          content = base64gzip(templatefile("${path.module}/templates/fah.config.xml.tftpl", {
             fah_config = var.fah_config
-          })
+          }))
         },
         {
-          path = "/home/jeremy/cloudflare.config.yml",
-          content = templatefile("${path.module}/templates/cloudflare.config.yml.tftpl", {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/cloudflare.config.yml",
+          content = base64gzip(templatefile("${path.module}/templates/cloudflare.config.yml.tftpl", {
             server_domain         = var.server_domain
             cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
-          })
+          }))
         },
         {
           encoding = "gzip+base64"
