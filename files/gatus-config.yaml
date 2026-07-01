@@ -82,6 +82,10 @@ endpoints:
     group: core
     url: "https://auth.${SERVER_DOMAIN}"
     <<: *status-200
+  - name: Wireguard
+    group: core
+    url: "https://wireguard.${SERVER_DOMAIN}"
+    <<: *status-200
   # Internal
   - name: Vaultwarden (Internal)
     group: internal
@@ -107,6 +111,10 @@ endpoints:
   - name: Authelia
     group: internal
     url: "http://authelia:9091"
+    <<: *status-200
+  - name: Wireguard
+    group: internal
+    url: "http://wg-easy:51821"
     <<: *status-200
   - name: Instance Metadata
     group: internal

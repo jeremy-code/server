@@ -9,7 +9,7 @@ edge-ip-version: auto
 region: us
 
 ingress:
-  %{~ for subdomain in ["vault.", "webdav.", "status.", "rss.", "auth.", ""] ~}
+  %{~ for subdomain in ["vault.", "webdav.", "status.", "rss.", "auth.", "wireguard.", ""] ~}
   - hostname: ${subdomain}${server_domain}/robots.txt
     service: http://robots-txt:8008
   %{~ endfor ~}
@@ -23,4 +23,6 @@ ingress:
     service: http://freshrss:80
   - hostname: auth.${server_domain}
     service: http://authelia:9091
+  - hostname: wireguard.${server_domain}
+    service: http://wg-easy:51821
   - service: http_status:404

@@ -17,7 +17,7 @@ resource "cloudflare_dns_record" "www" {
 }
 
 resource "cloudflare_dns_record" "tunnels" {
-  for_each = toset(["@", "webdav", "vault", "rss", "status", "auth"])
+  for_each = toset(["@", "webdav", "vault", "rss", "status", "auth", "wireguard"])
   content  = "${cloudflare_zero_trust_tunnel_cloudflared.main.id}.cfargotunnel.com"
   name     = each.value
   proxied  = true
@@ -29,6 +29,15 @@ resource "cloudflare_dns_record" "tunnels" {
 resource "cloudflare_dns_record" "ssh" {
   content = oci_core_instance.main.public_ip
   name    = "ssh"
+  proxied = false
+  ttl     = 1
+  type    = "A"
+  zone_id = cloudflare_zone.main.id
+}
+
+resource "cloudflare_dns_record" "vpn" {
+  content = oci_core_instance.main.public_ip
+  name    = "vpn"
   proxied = false
   ttl     = 1
   type    = "A"

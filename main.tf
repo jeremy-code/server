@@ -44,7 +44,7 @@ resource "oci_vault_secret" "cloudflare_tunnel_secret" {
 }
 
 locals {
-  auth_clients = ["gatus", "vaultwarden", "freshrss"]
+  auth_clients = ["gatus", "vaultwarden", "freshrss", "wg_easy"]
 }
 
 resource "oci_vault_secret" "auth_client_secrets" {
@@ -334,6 +334,16 @@ locals {
         }
         server_domain = var.server_domain
         smtp_from     = oci_email_sender.senders["auth"].email_address
+      })
+    },
+    {
+      path = "/home/jeremy/wg-easy.env",
+      content = templatefile("${path.module}/templates/wg-easy.env.tftpl", {
+        auth = {
+          client_id     = local.auth_client_ids.wg_easy
+          client_secret = local.auth_client_secrets.wg_easy
+        }
+        server_domain = var.server_domain
       })
     },
     {
