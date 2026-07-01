@@ -24,6 +24,17 @@ resource "oci_core_security_list" "instance" {
     }
   }
 
+  ingress_security_rules {
+    description = "Allow WireGuard traffic"
+    source      = "0.0.0.0/0"
+    source_type = "CIDR_BLOCK"
+    protocol    = 17 # UDP
+    udp_options {
+      min = 51820
+      max = 51820
+    }
+  }
+
   # TODO: Limit egress traffic to only necessary destinations (e.g. Cloudflare,
   # Ubuntu, Docker, Oracle, etc.)
   egress_security_rules {

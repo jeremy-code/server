@@ -80,6 +80,7 @@ services:
       - foldingathome
       - freshrss
       - authelia
+      - wg-easy
     environment:
       SERVER_DOMAIN: "${server_domain}"
       EMAIL_FROM: "${email.gatus}"
@@ -107,6 +108,7 @@ services:
       - gatus
       - freshrss
       - authelia
+      - wg-easy
     restart: always
     volumes:
       - "/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/"
@@ -186,6 +188,22 @@ services:
     volumes:
       - "./users_database.yml:/config/users_database.yml"
       - "/mnt/oraclevdb/authelia/:/config/"
+
+  wg-easy:
+    container_name: wg-easy
+    image: ghcr.io/wg-easy/wg-easy:edge
+    restart: always
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    volumes:
+      - /mnt/oraclevdb/wireguard/:/etc/wireguard/
+    ports:
+      - 51820:51820/udp
+    env_file: ./wg-easy.env
 
 configs:
   rclone-config:
