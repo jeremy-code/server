@@ -6,6 +6,8 @@ services:
     image: "vaultwarden/server:latest"
     restart: always
     user: 1001:1001
+    depends_on:
+      - authelia
     env_file: vaultwarden.env
     volumes:
       - "/mnt/oraclevdb/vaultwarden/:/data/"
@@ -74,6 +76,7 @@ services:
   cloudflared:
     container_name: cloudflared
     image: "cloudflare/cloudflared:latest"
+    restart: always
     depends_on:
       - vaultwarden
       - rclone
@@ -82,7 +85,6 @@ services:
       - freshrss
       - authelia
       - wg-easy
-    restart: always
     volumes:
       - "/mnt/oraclevdb/cloudflared:/user/nonroot/.cloudflared/"
     command: tunnel run
@@ -120,6 +122,9 @@ services:
     container_name: freshrss
     image: freshrss/freshrss:latest
     restart: always
+    depends_on:
+      - authelia
+    env_file: ./freshrss.env
     volumes:
       - /mnt/oraclevdb/freshrss/:/var/www/FreshRSS/data/
     configs:
@@ -127,13 +132,20 @@ services:
         target: /var/www/FreshRSS/data/opml.xml
         uid: "33"
         gid: "33"
-    env_file: ./freshrss.env
 
   authelia:
     container_name: authelia
     image: "authelia/authelia:latest"
     restart: always
     env_file: ./authelia.env
+    volumes:
+      - "./users_database.yml:/config/users_database.yml"
+      - "/mnt/oraclevdb/authelia/:/config/"
+    configs:
+      - source: authelia-config
+        target: /config/configuration.yml
+        uid: "1001"
+        gid: "1001"
     secrets:
       [
         "jwt-secret",
@@ -142,30 +154,24 @@ services:
         "hmac-secret",
         "authelia-oidc-signing-key",
       ]
-    configs:
-      - source: authelia-config
-        target: /config/configuration.yml
-        uid: "1001"
-        gid: "1001"
-    volumes:
-      - "./users_database.yml:/config/users_database.yml"
-      - "/mnt/oraclevdb/authelia/:/config/"
 
   wg-easy:
     container_name: wg-easy
     image: ghcr.io/wg-easy/wg-easy:edge
     restart: always
+    depends_on:
+      - authelia
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
     sysctls:
-      - net.ipv4.ip_forward=1
-      - net.ipv4.conf.all.src_valid_mark=1
+      net.ipv4.ip_forward: 1
+      net.ipv4.conf.all.src_valid_mark: 1
+    env_file: ./wg-easy.env
     volumes:
       - /mnt/oraclevdb/wireguard/:/etc/wireguard/
     ports:
       - 51820:51820/udp
-    env_file: ./wg-easy.env
 
 configs:
   rclone-config:
