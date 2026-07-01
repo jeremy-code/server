@@ -14,4 +14,11 @@ terraform {
       version = "~> 3.9"
     }
   }
+
+  cloud {
+    organization = "jeremynguyen"
+    workspaces {
+      name = "server"
+    }
+  }
 }
