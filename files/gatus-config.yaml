@@ -4,9 +4,12 @@ storage:
   caching: true
 
 security:
-  basic:
-    username: "${USERNAME}"
-    password-bcrypt-base64: "${ENCODED_HASHED_PASSWORD}"
+  oidc:
+    issuer-url: "https://auth.${SERVER_DOMAIN}"
+    redirect-url: "https://status.${SERVER_DOMAIN}/authorization-code/callback"
+    client-id: "${CLIENT_ID}"
+    client-secret: "${CLIENT_SECRET}"
+    scopes: [openid]
 
 web:
   port: 8080
@@ -50,7 +53,6 @@ alerting:
       <<: *default-endpoint
       conditions:
         - "[STATUS] == 401"
-        - "[BODY] == 401 Unauthorized"
         - "[RESPONSE_TIME] < 1000"
 
 endpoints:
@@ -75,6 +77,10 @@ endpoints:
   - name: FreshRSS
     group: core
     url: "https://rss.${SERVER_DOMAIN}"
+    <<: *status-401
+  - name: Authelia
+    group: core
+    url: "https://auth.${SERVER_DOMAIN}"
     <<: *status-200
   # Internal
   - name: Vaultwarden (Internal)
@@ -93,11 +99,15 @@ endpoints:
   - name: FreshRSS (Internal)
     group: internal
     url: "http://freshrss:80"
-    <<: *status-200
+    <<: *status-401
   - name: Folding@home
     group: internal
     url: "http://foldingathome:7396"
     <<: *status-307
+  - name: Authelia
+    group: internal
+    url: "http://authelia:9091"
+    <<: *status-200
   - name: Instance Metadata
     group: internal
     url: "http://169.254.169.254/opc/v2/instance/"

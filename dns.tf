@@ -21,7 +21,7 @@ locals {
 }
 
 resource "cloudflare_dns_record" "tunnels" {
-  for_each = toset(["@", "webdav", "vault", "rss", "status"])
+  for_each = toset(["@", "webdav", "vault", "rss", "status", "auth"])
   content  = local.cloudflare_tunnel_url
   name     = each.value == "@" ? var.server_domain : "${each.value}.${var.server_domain}"
   proxied  = true

@@ -47,7 +47,7 @@ variable "cloudflare_api_token" {
 
 variable "cloudflare_account_id" {
   type        = string
-  description = "Cloudflare API token"
+  description = "Cloudflare Account ID"
 }
 
 variable "server_domain" {
@@ -55,9 +55,12 @@ variable "server_domain" {
   description = "The domain name for the server"
 }
 
-variable "email_address" {
-  type        = string
-  description = "The email address to contact for alerts"
+variable "user_config" {
+  type = object({
+    email_address = string
+    password      = string
+  })
+  description = "The configuration for the user"
 
   # Regex based on HTML standard used to validate `<input type=email>` by browsers
   # https://html.spec.whatwg.org/multipage/input.html#email-state-(type=email)
@@ -65,19 +68,11 @@ variable "email_address" {
     condition = can(
       regex(
         "^[\\w.!#$%&'*+\\/=?^`{|}~-]+@[[:alnum:]](?:[a-zA-Z0-9-]{0,61}[[:alnum:]])?(?:\\.[[:alnum:]](?:[a-zA-Z0-9-]{0,61}[[:alnum:]])?)*$",
-        var.email_address
+        var.user_config.email_address
       )
     )
     error_message = "The email address must be valid"
   }
-}
-
-variable "freshrss_config" {
-  type = object({
-    email    = string
-    password = string
-  })
-  description = "The admin user credentials for FreshRSS"
 }
 
 variable "rclone_config" {
@@ -86,14 +81,6 @@ variable "rclone_config" {
     password = string
   })
   description = "The Rclone user credentials for authenticating to the WebDAV server"
-}
-
-variable "gatus_config" {
-  type = object({
-    username = string
-    password = string
-  })
-  description = "The credentials for Gatus basic authentication"
 }
 
 variable "fah_config" {

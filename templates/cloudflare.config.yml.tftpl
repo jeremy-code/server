@@ -9,7 +9,7 @@ edge-ip-version: auto
 region: us
 
 ingress:
-  %{~ for subdomain in ["vault.", "webdav.", "status.", "rss.", ""] ~}
+  %{~ for subdomain in ["vault.", "webdav.", "status.", "rss.", "auth.", ""] ~}
   - hostname: ${subdomain}${server_domain}/robots.txt
     service: http://robots-txt:8008
   %{~ endfor ~}
@@ -21,4 +21,6 @@ ingress:
     service: http://gatus:8080
   - hostname: rss.${server_domain}
     service: http://freshrss:80
+  - hostname: auth.${server_domain}
+    service: http://authelia:9091
   - service: http_status:404
