@@ -146,13 +146,10 @@ services:
     image: freshrss/freshrss:latest
     restart: always
     volumes:
-      - /mnt/oraclevdb/freshrss/:/var/www/FreshRSS/data
+      - /mnt/oraclevdb/freshrss/:/var/www/FreshRSS/data/
     configs:
       - source: opml-xml
-        # While /var/wwww/FreshRSS/data/opml.xml would be preferred, since the
-        # data directory is a bind mount, Docker will error: "mountpoint
-        # ".../freshrss/data/opml.xml" is outside of rootfs"
-        target: /var/www/FreshRSS/opml.default.xml
+        target: /var/www/FreshRSS/data/opml.xml
         uid: "33"
         gid: "33"
     environment:
