@@ -6,28 +6,7 @@ services:
     image: "vaultwarden/server:latest"
     restart: always
     user: 1001:1001
-    environment:
-      # Database settings
-      DATABASE_URL_FILE: "/run/secrets/vaultwarden-database-url"
-      # General settings
-      DOMAIN: "https://vault.${server_domain}"
-      TRASH_AUTO_DELETE_DAYS: 90
-      SIGNUPS_ALLOWED: false
-      # Advanced settings
-      IP_HEADER: "CF-Connecting-IP" # https://developers.cloudflare.com/fundamentals/reference/http-headers/
-      EXPERIMENTAL_CLIENT_FEATURE_FLAGS: "ssh-key-vault-item"
-      LOG_FILE: "/data/logs/vaultwarden.log"
-      # SSO settings (OpenID Connect)
-      SSO_ENABLED: true
-      SSO_AUTHORITY: https://auth.${server_domain}
-      SSO_CLIENT_ID: ${auth.client_ids.vaultwarden}
-      SSO_CLIENT_SECRET: ${auth.client_secrets.vaultwarden}
-      # SMTP Email settings
-      SMTP_HOST: "$${SMTP_HOST}"
-      SMTP_FROM: "${email.vaultwarden}"
-      SMTP_FROM_NAME: "Vaultwarden"
-      SMTP_USERNAME: "$${SMTP_PASSWORD}"
-      SMTP_PASSWORD: "$${SMTP_PASSWORD}"
+    env_file: vaultwarden.env
     volumes:
       - "/mnt/oraclevdb/vaultwarden/:/data/"
     secrets:
@@ -40,7 +19,8 @@ services:
     image: "rclone/rclone:latest"
     restart: always
     user: 1001:1001
-    command: serve webdav oos:${bucket_name} --addr rclone:9800 --etag-hash auto --gid 1001 --htpasswd /run/secrets/htpasswd --uid 1001
+    # Set main-bucket to name of bucket (oci_objectstorage_bucket.main.name)
+    command: serve webdav oos:main-bucket --addr rclone:9800 --etag-hash auto --gid 1001 --htpasswd /run/secrets/htpasswd --uid 1001
     volumes:
       - "/mnt/oraclevdb/rclone/:/data/"
     configs:
@@ -81,15 +61,8 @@ services:
       - freshrss
       - authelia
       - wg-easy
-    environment:
-      SERVER_DOMAIN: "${server_domain}"
-      EMAIL_FROM: "${email.gatus}"
-      EMAIL_TO: "${email.owner}"
-      SMTP_HOST: "$${SMTP_HOST}"
-      SMTP_USERNAME: "$${SMTP_USERNAME}"
-      SMTP_PASSWORD: "$${SMTP_PASSWORD}"
-      CLIENT_ID: ${auth.client_ids.gatus}
-      CLIENT_SECRET: ${auth.client_secrets.gatus}
+    env_file:
+      - gatus.env
     volumes:
       - "/mnt/oraclevdb/gatus/:/data/"
     configs:
@@ -121,7 +94,7 @@ services:
         mode: 0400
     secrets:
       - source: cloudflared-credentials-file
-        target: ${cloudflared_tunnel_id}.json
+        target: credentials-file.json
         uid: "65532"
         gid: "65532"
         mode: 0400
@@ -154,32 +127,21 @@ services:
         target: /var/www/FreshRSS/data/opml.xml
         uid: "33"
         gid: "33"
-    environment:
-      TZ: America/Los_Angeles
-      GATUS_DELAY_START_SECONDS: 10
-      CRON_MIN: 2,32 # Minutes 2, 31
-      OIDC_ENABLED: 1
-      OIDC_PROVIDER_METADATA_URL: https://auth.${server_domain}/.well-known/openid-configuration
-      OIDC_CLIENT_ID: ${auth.client_ids.freshrss}
-      OIDC_CLIENT_SECRET: ${auth.client_secrets.freshrss}
-      OIDC_X_FORWARDED_HEADERS: "X-Forwarded-Proto"
-      OIDC_SCOPES: openid email profile offline_access
-      FRESHRSS_INSTALL: |-
-        --auth-type http_auth
-        --base-url https://rss.${server_domain}
-        --title Jeremy's\ RSS\ feed
-      FRESHRSS_USER: |-
-        --user jeremy
-        --language en
-        --email "${email.owner}"
-        --password "${auth.client_secrets.freshrss}"
+    env_file: ./freshrss.env
 
   authelia:
     container_name: authelia
-    image: 'authelia/authelia:latest'
+    image: "authelia/authelia:latest"
     restart: always
     env_file: ./authelia.env
-    secrets: ['jwt-secret', 'session-secret', 'storage-encryption-key', "hmac-secret", "authelia-oidc-signing-key"]
+    secrets:
+      [
+        "jwt-secret",
+        "session-secret",
+        "storage-encryption-key",
+        "hmac-secret",
+        "authelia-oidc-signing-key",
+      ]
     configs:
       - source: authelia-config
         target: /config/configuration.yml
@@ -234,12 +196,12 @@ secrets:
   cloudflared-credentials-file:
     file: ./cloudflared-credentials-file.json
   jwt-secret:
-    file: './jwt-secret'
+    file: "./jwt-secret"
   session-secret:
-    file: './session-secret'
+    file: "./session-secret"
   hmac-secret:
-    file: './hmac-secret'
+    file: "./hmac-secret"
   storage-encryption-key:
-    file: './storage-encryption-key'
+    file: "./storage-encryption-key"
   authelia-oidc-signing-key:
-    file: './authelia-oidc-signing-key'
+    file: "./authelia-oidc-signing-key"

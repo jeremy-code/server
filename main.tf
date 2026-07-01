@@ -150,7 +150,8 @@ resource "oci_mysql_mysql_db_system" "main" {
   lifecycle {
     prevent_destroy = true
     ignore_changes = [
-      # Per manually updating password in console instead of destroying it
+      # Manually update the admin_password in console instead of destroying it
+      # with Terraform
       admin_password,
     ]
   }
@@ -231,22 +232,25 @@ locals {
 # files to reduce metadata size since the maximum metadata size is 32,000 bytes
 # (32kB). For more information, see oracle/terraform-provider-oci#635.
 locals {
-  cloud_init_write_files = [
-    {
-      path    = "/etc/sysctl.d/local.conf",
-      content = <<-EOF
+  cloud_init_write_files = flatten(
+    [
+      # System files
+      [
+        {
+          path    = "/etc/sysctl.d/local.conf",
+          content = <<-EOF
                 # See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes
                 # Defaults to 212,992 bytes = 208 KiB. Update to 7,864,000 bytes = 7.5 MiB
                 net.core.rmem_max = 7864000
                 net.core.wmem_max = 7864000
                 EOF
-    },
-    {
-      path        = "/etc/environment",
-      owner       = "root:root",
-      permissions = "0644",
-      append      = true,
-      content     = <<-EOF
+        },
+        {
+          path        = "/etc/environment",
+          owner       = "root:root",
+          permissions = "0644",
+          append      = true,
+          content     = <<-EOF
                 # https://manpages.ubuntu.com/manpages/noble/man8/pam_env.8.html
 
                 # Docker CLI
@@ -262,162 +266,201 @@ locals {
                 COMPOSE_FILE=/home/jeremy/docker-compose.yml
                 COMPOSE_REMOVE_ORPHANS=1
                 EOF
-    },
-    {
-      path        = "/etc/logrotate.conf",
-      owner       = "root:root",
-      permissions = "0644",
-      append      = true,
-      content     = file("${path.module}/files/logrotate.conf")
-    },
-    {
-      path = "/home/jeremy/.env",
-      content = templatefile("${path.module}/templates/.env.tftpl", {
-        smtp_config = {
-          username = oci_identity_smtp_credential.main.username
-          password = oci_identity_smtp_credential.main.password
-          host     = "smtp.email.${var.region}.oci.oraclecloud.com"
+        },
+        {
+          path        = "/etc/logrotate.conf",
+          owner       = "root:root",
+          permissions = "0644",
+          append      = true,
+          content     = file("${path.module}/files/logrotate.conf")
+        },
+      ],
+      # Env
+      [
+        {
+          path = "/home/jeremy/.env",
+          content = templatefile("${path.module}/templates/env/.env.tftpl", {
+            smtp_config = {
+              username = oci_identity_smtp_credential.main.username
+              password = oci_identity_smtp_credential.main.password
+              host     = "smtp.email.${var.region}.oci.oraclecloud.com"
+            }
+          })
+        },
+        {
+          path = "/home/jeremy/authelia.env",
+          content = templatefile("${path.module}/templates/env/authelia.env.tftpl", {
+            auth = {
+              client_ids     = local.auth_client_ids
+              client_secrets = zipmap(keys(local.auth_client_secrets), [for auth_client_secret in values(local.auth_client_secrets) : bcrypt(auth_client_secret, 12)])
+            }
+            server_domain = var.server_domain
+            smtp_from     = oci_email_sender.senders["auth"].email_address
+          })
+        },
+        {
+          path = "/home/jeremy/wg-easy.env",
+          content = templatefile("${path.module}/templates/env/wg-easy.env.tftpl", {
+            auth = {
+              client_id     = local.auth_client_ids.wg_easy
+              client_secret = local.auth_client_secrets.wg_easy
+            }
+            server_domain = var.server_domain
+          })
+        },
+        {
+          path = "/home/jeremy/gatus.env",
+          content = templatefile("${path.module}/templates/env/gatus.env.tftpl", {
+            auth = {
+              client_id     = local.auth_client_ids["gatus"]
+              client_secret = local.auth_client_secrets["gatus"]
+            }
+            server_domain = var.server_domain
+            email = {
+              gatus = oci_email_sender.senders["status"].email_address
+              owner = var.user_config.email_address
+            }
+          })
+        },
+        {
+          path = "/home/jeremy/freshrss.env",
+          content = templatefile("${path.module}/templates/env/freshrss.env.tftpl", {
+            server_domain = var.server_domain
+            auth = {
+              client_id     = local.auth_client_ids["freshrss"]
+              client_secret = local.auth_client_secrets["freshrss"]
+            }
+            email = {
+              owner = var.user_config.email_address
+            }
+          })
+        },
+        {
+          path = "/home/jeremy/vaultwarden.env",
+          content = templatefile("${path.module}/templates/env/vaultwarden.env.tftpl", {
+            auth = {
+              client_id     = local.auth_client_ids.vaultwarden
+              client_secret = local.auth_client_secrets.vaultwarden
+            }
+            server_domain = var.server_domain
+            email = {
+              vaultwarden = oci_email_sender.senders["vault"].email_address
+            }
+          })
+        },
+      ],
+      # Secrets
+      [
+        {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/authelia-oidc-signing-key"
+          content  = base64gzip(local.authelia_oidc_signing_key.privateKey)
+        },
+        {
+          path    = "/home/jeremy/hmac-secret",
+          content = local.authelia.hmac_secret
+        },
+        {
+          path    = "/home/jeremy/jwt-secret",
+          content = local.authelia.jwt_secret
+        },
+        {
+          path    = "/home/jeremy/session-secret",
+          content = local.authelia.session_secret
+        },
+        {
+          path    = "/home/jeremy/storage-encryption-key",
+          content = local.authelia.storage_encryption_key
+        },
+        {
+          path    = "/home/jeremy/htpasswd",
+          content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
+          # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
+          permissions = "0440",
+          owner       = "jeremy:jeremy",
+          # Wait until user is created
+          defer = true,
+        },
+        {
+          path = "/home/jeremy/vaultwarden-database-url",
+          content = join("", [
+            "mysql://",
+            oci_mysql_mysql_db_system.main.admin_username,
+            ":",
+            urlencode(base64decode(local.mysql_db_password)),
+            "@",
+            oci_mysql_mysql_db_system.main.ip_address,
+            ":",
+            oci_mysql_mysql_db_system.main.port,
+            "/vaultwarden"
+          ]),
+        },
+        {
+          path = "/home/jeremy/cloudflared-credentials-file.json",
+          content = jsonencode({
+            AccountTag   = cloudflare_zero_trust_tunnel_cloudflared.main.account_tag
+            TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.main.id
+            TunnelSecret = local.cloudflare_tunnel_secret
+          }),
+        },
+      ],
+      # Configs
+      [
+        {
+          path    = "/home/jeremy/opml.xml",
+          content = file("${path.module}/files/opml.xml"),
+        },
+        {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/authelia.configuration.yml",
+          content  = base64gzip(file("${path.module}/files/authelia.configuration.yml")),
+        },
+        {
+          path = "/home/jeremy/users_database.yml",
+          content = templatefile("${path.module}/templates/users_database.yml.tftpl", {
+            user_config = {
+              email_address = var.user_config.email_address
+              password      = bcrypt(var.user_config.password, 12)
+            }
+          })
+        },
+        {
+          encoding = "gzip+base64",
+          path     = "/home/jeremy/gatus-config.yaml",
+          content  = base64gzip(file("${path.module}/files/gatus-config.yaml")),
+        },
+        {
+          path = "/home/jeremy/rclone.conf",
+          content = templatefile("${path.module}/templates/rclone.conf.tftpl", {
+            oos_config = {
+              region              = var.region
+              namespace           = data.oci_objectstorage_namespace.main.namespace
+              compartment_id      = oci_identity_compartment.main.id
+              bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
+            }
+          })
+        },
+        {
+          path = "/home/jeremy/fah.config.xml",
+          content = templatefile("${path.module}/templates/fah.config.xml.tftpl", {
+            fah_config = var.fah_config
+          })
+        },
+        {
+          path = "/home/jeremy/cloudflare.config.yml",
+          content = templatefile("${path.module}/templates/cloudflare.config.yml.tftpl", {
+            server_domain         = var.server_domain
+            cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
+          })
+        },
+        {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/docker-compose.yml",
+          content  = base64gzip(file("${path.module}/files/docker-compose.yml"))
         }
-      })
-    },
-    {
-      path    = "/home/jeremy/opml.xml",
-      content = file("${path.module}/files/opml.xml"),
-    },
-    {
-      encoding = "gzip+base64"
-      path     = "/home/jeremy/authelia-oidc-signing-key"
-      content  = base64gzip(local.authelia_oidc_signing_key.privateKey)
-    },
-    {
-      encoding = "gzip+base64"
-      path     = "/home/jeremy/authelia.configuration.yml",
-      content  = base64gzip(file("${path.module}/files/authelia.configuration.yml")),
-    },
-    { path = "/home/jeremy/users_database.yml",
-      content = templatefile("${path.module}/templates/users_database.yml.tftpl", {
-        email_address = var.user_config.email_address
-        password      = bcrypt(var.user_config.password, 12)
-      })
-    },
-    {
-      path    = "/home/jeremy/hmac-secret",
-      content = local.authelia.hmac_secret
-    },
-    {
-      path    = "/home/jeremy/jwt-secret",
-      content = local.authelia.jwt_secret
-    },
-    {
-      path    = "/home/jeremy/session-secret",
-      content = local.authelia.session_secret
-    },
-    {
-      path    = "/home/jeremy/storage-encryption-key",
-      content = local.authelia.storage_encryption_key
-    },
-    {
-      path    = "/home/jeremy/htpasswd",
-      content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
-      # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
-      permissions = "0440",
-      owner       = "jeremy:jeremy",
-      # Wait until user is created
-      defer = true,
-    },
-    {
-      path = "/home/jeremy/authelia.env",
-      content = templatefile("${path.module}/templates/authelia.env.tftpl", {
-        auth = {
-          client_ids     = local.auth_client_ids
-          client_secrets = zipmap(keys(local.auth_client_secrets), [for auth_client_secret in values(local.auth_client_secrets) : bcrypt(auth_client_secret, 12)])
-        }
-        server_domain = var.server_domain
-        smtp_from     = oci_email_sender.senders["auth"].email_address
-      })
-    },
-    {
-      path = "/home/jeremy/wg-easy.env",
-      content = templatefile("${path.module}/templates/wg-easy.env.tftpl", {
-        auth = {
-          client_id     = local.auth_client_ids.wg_easy
-          client_secret = local.auth_client_secrets.wg_easy
-        }
-        server_domain = var.server_domain
-      })
-    },
-    {
-      path = "/home/jeremy/vaultwarden-database-url",
-      content = join("", [
-        "mysql://",
-        oci_mysql_mysql_db_system.main.admin_username,
-        ":",
-        urlencode(base64decode(local.mysql_db_password)),
-        "@",
-        oci_mysql_mysql_db_system.main.ip_address,
-        ":",
-        oci_mysql_mysql_db_system.main.port,
-        "/vaultwarden"
-      ]),
-    },
-    {
-      encoding = "gzip+base64",
-      path     = "/home/jeremy/gatus-config.yaml",
-      content  = base64gzip(file("${path.module}/files/gatus-config.yaml")),
-    },
-    {
-      path = "/home/jeremy/cloudflared-credentials-file.json",
-      content = jsonencode({
-        AccountTag   = cloudflare_zero_trust_tunnel_cloudflared.main.account_tag
-        TunnelID     = cloudflare_zero_trust_tunnel_cloudflared.main.id
-        TunnelSecret = local.cloudflare_tunnel_secret
-      }),
-    },
-    {
-      path = "/home/jeremy/rclone.conf",
-      content = templatefile("${path.module}/templates/rclone.conf.tftpl", {
-        oos_config = {
-          bucket_name         = oci_objectstorage_bucket.main.name
-          region              = var.region
-          namespace           = data.oci_objectstorage_namespace.main.namespace
-          compartment_id      = oci_identity_compartment.main.id
-          bucket_storage_tier = oci_objectstorage_bucket.main.storage_tier
-        }
-      })
-    },
-    {
-      path = "/home/jeremy/fah.config.xml",
-      content = templatefile("${path.module}/templates/fah.config.xml.tftpl", {
-        fah_config = var.fah_config
-      })
-    },
-    {
-      path = "/home/jeremy/cloudflare.config.yml",
-      content = templatefile("${path.module}/templates/cloudflare.config.yml.tftpl", {
-        server_domain         = var.server_domain
-        cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
-      })
-    },
-    {
-      encoding = "gzip+base64"
-      path     = "/home/jeremy/docker-compose.yml",
-      content = base64gzip(templatefile("${path.module}/templates/docker-compose.yml.tftpl", {
-        server_domain         = var.server_domain
-        bucket_name           = oci_objectstorage_bucket.main.name
-        cloudflared_tunnel_id = cloudflare_zero_trust_tunnel_cloudflared.main.id
-        email = {
-          vaultwarden = oci_email_sender.senders["vault"].email_address
-          gatus       = oci_email_sender.senders["status"].email_address
-          auth        = oci_email_sender.senders["auth"].email_address
-          owner       = var.user_config.email_address
-        }
-        auth = {
-          client_ids     = local.auth_client_ids
-          client_secrets = local.auth_client_secrets
-        }
-      }))
-    }
-  ]
+      ]
+    ]
+  )
   cloud_init = base64encode(
     # Append write_files manually
     format(
