@@ -7,8 +7,10 @@ data "oci_identity_availability_domain" "main" {
   id             = (data.oci_identity_availability_domains.main.availability_domains[0]).id
 }
 
-data "oci_secrets_secretbundle" "mysql_db_password" {
-  secret_id = oci_vault_secret.mysql_db_password.id
+data "oci_secrets_secretbundle" "database_passwords" {
+  for_each = toset(local.database_usernames)
+
+  secret_id = oci_vault_secret.database_passwords[each.key].id
 }
 
 data "oci_secrets_secretbundle" "cloudflare_tunnel_secret" {

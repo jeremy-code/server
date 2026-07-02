@@ -1,0 +1,5 @@
+-- https://github.com/dani-garcia/vaultwarden/wiki/Using-the-MariaDB-(MySQL)-Backend#foreign-key-errors-collation-and-charset
+CREATE DATABASE IF NOT EXISTS vaultwarden
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'vaultwarden'@'%' IDENTIFIED BY '${database_passwords.vaultwarden}';
+GRANT ALTER, CREATE, DELETE, DROP, INDEX, INSERT, REFERENCES, SELECT, UPDATE ON `vaultwarden`.* TO 'vaultwarden'@'%';

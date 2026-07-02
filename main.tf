@@ -20,12 +20,18 @@ resource "oci_kms_key" "main" {
   }
 }
 
-resource "oci_vault_secret" "mysql_db_password" {
+locals {
+  database_usernames = ["admin", "vaultwarden"]
+}
+
+resource "oci_vault_secret" "database_passwords" {
+  for_each = toset(local.database_usernames)
+
   compartment_id         = oci_identity_compartment.main.id
   key_id                 = oci_kms_key.main.id
-  secret_name            = "mysql_db_password"
+  secret_name            = "mysql_db_password_${each.key}"
   vault_id               = oci_kms_vault.main.id
-  description            = "MySQL database password"
+  description            = "MySQL database password for user ${each.key}"
   enable_auto_generation = true
 
   secret_generation_context {
@@ -101,7 +107,7 @@ resource "oci_vault_secret" "authelia" {
 
 
 locals {
-  mysql_db_password         = one(data.oci_secrets_secretbundle.mysql_db_password.secret_bundle_content[*].content)
+  database_passwords        = zipmap(local.database_usernames, [for database_username in local.database_usernames : base64decode(one(data.oci_secrets_secretbundle.database_passwords[database_username].secret_bundle_content[*].content))])
   cloudflare_tunnel_secret  = one(data.oci_secrets_secretbundle.cloudflare_tunnel_secret.secret_bundle_content[*].content)
   auth_client_secrets       = zipmap(local.auth_clients, [for client in local.auth_clients : one(data.oci_secrets_secretbundle.auth_client_secrets[client].secret_bundle_content[*].content)])
   authelia                  = zipmap(local.authelia_secrets, [for client in local.authelia_secrets : one(data.oci_secrets_secretbundle.authelia[client].secret_bundle_content[*].content)])
@@ -117,7 +123,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared" "main" {
 
 resource "oci_mysql_mysql_db_system" "main" {
   admin_username      = "admin"
-  admin_password      = base64decode(local.mysql_db_password)
+  admin_password      = local.database_passwords.admin
   availability_domain = data.oci_identity_availability_domain.main.name
   compartment_id      = oci_identity_compartment.main.id
   crash_recovery      = "ENABLED"
@@ -274,6 +280,26 @@ locals {
           append      = true,
           content     = file("${path.module}/files/logrotate.conf")
         },
+        {
+          path = "/home/jeremy/.my.cnf",
+          content = templatefile("${path.module}/templates/.my.cnf.tftpl", {
+            username = oci_mysql_mysql_db_system.main.admin_username
+            password = local.database_passwords.admin
+            host     = oci_mysql_mysql_db_system.main.ip_address
+          })
+          permissions = "0600"
+          owner       = "jeremy:jeremy",
+          # Wait until user is created
+          defer = true,
+        },
+        {
+          path = "/home/jeremy/init.sql",
+          content = templatefile("${path.module}/templates/init.sql.tftpl", {
+            database_passwords = local.database_passwords
+          })
+          owner = "jeremy:jeremy",
+          defer = true,
+        }
       ],
       # Env
       [
@@ -282,7 +308,7 @@ locals {
           content = templatefile("${path.module}/templates/env/.env.tftpl", {
             smtp_config = {
               username = oci_identity_smtp_credential.main.username
-              password = oci_identity_smtp_credential.main.password
+              password = local.database_passwords.admin
               host     = "smtp.email.${var.region}.oci.oraclecloud.com"
             }
           })
@@ -382,16 +408,15 @@ locals {
           # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
           permissions = "0440",
           owner       = "jeremy:jeremy",
-          # Wait until user is created
-          defer = true,
+          defer       = true,
         },
         {
           path = "/home/jeremy/vaultwarden-database-url",
           content = join("", [
             "mysql://",
-            oci_mysql_mysql_db_system.main.admin_username,
+            "vaultwarden",
             ":",
-            urlencode(base64decode(local.mysql_db_password)),
+            urlencode(local.database_passwords.vaultwarden),
             "@",
             oci_mysql_mysql_db_system.main.ip_address,
             ":",
