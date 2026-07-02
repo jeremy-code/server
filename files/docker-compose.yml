@@ -153,6 +153,7 @@ services:
         "storage-encryption-key",
         "hmac-secret",
         "authelia-oidc-signing-key",
+        "authelia-redis-password",
       ]
 
   wg-easy:
@@ -172,6 +173,24 @@ services:
       - /mnt/oraclevdb/wireguard/:/etc/wireguard/
     ports:
       - 51820:51820/udp
+
+  redis:
+    container_name: redis
+    image: redis:8
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - /mnt/oraclevdb/redis/:/data/
+    configs:
+      - source: redis-config
+        target: /usr/local/etc/redis/redis.conf
+        uid: "999"
+        gid: "999"
+    secrets:
+      - source: redis-users-acl
+        target: /usr/local/etc/redis/users.acl
+        uid: "999"
+        gid: "999"
 
 configs:
   rclone-config:
@@ -193,6 +212,8 @@ configs:
     file: ./fah.config.xml
   authelia-config:
     file: ./authelia.configuration.yml
+  redis-config:
+    file: ./redis.conf
 
 secrets:
   vaultwarden-database-url:
@@ -211,3 +232,7 @@ secrets:
     file: "./storage-encryption-key"
   authelia-oidc-signing-key:
     file: "./authelia-oidc-signing-key"
+  authelia-redis-password:
+    file: "./authelia-redis-password"
+  redis-users-acl:
+    file: "./redis.users.acl"

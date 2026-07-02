@@ -1,3 +1,7 @@
 {
-  "recommendations": ["hashicorp.terraform", "esbenp.prettier-vscode"]
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "hashicorp.terraform",
+    "redis.redis-for-vscode"
+  ]
 }
