@@ -71,8 +71,11 @@ regulation:
 # Storage Provider Configuration
 storage:
   encryption_key: '{{ secret "/run/secrets/storage-encryption-key" }}'
-  local:
-    path: /config/db.sqlite3
+  mysql:
+    address: 'tcp://{{ env "DB_HOST" }}:3306'
+    database: authelia
+    username: '{{ env "DB_USERNAME" }}'
+    password: '{{ env "DB_PASSWORD" }}'
 
 # Notification Provider
 notifier:

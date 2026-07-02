@@ -21,7 +21,7 @@ resource "oci_kms_key" "main" {
 }
 
 locals {
-  database_usernames = ["admin", "vaultwarden"]
+  database_usernames = ["admin", "vaultwarden", "authelia"]
 }
 
 resource "oci_vault_secret" "database_passwords" {
@@ -322,6 +322,11 @@ locals {
             }
             server_domain = var.server_domain
             smtp_from     = oci_email_sender.senders["auth"].email_address
+            db = {
+              username = "authelia"
+              password = local.database_passwords.authelia
+              host     = oci_mysql_mysql_db_system.main.ip_address
+            }
           })
         },
         {

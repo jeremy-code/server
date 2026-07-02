@@ -3,3 +3,9 @@ CREATE DATABASE IF NOT EXISTS vaultwarden
   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS 'vaultwarden'@'%' IDENTIFIED BY '${database_passwords.vaultwarden}';
 GRANT ALTER, CREATE, DELETE, DROP, INDEX, INSERT, REFERENCES, SELECT, UPDATE ON `vaultwarden`.* TO 'vaultwarden'@'%';
+
+-- https://www.authelia.com/reference/integrations/database-integrations/#mysql
+CREATE DATABASE IF NOT EXISTS authelia
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci;
+CREATE USER IF NOT EXISTS 'authelia'@'%' IDENTIFIED BY '${database_passwords.authelia}';
+GRANT ALL ON `authelia`.* TO 'authelia'@'%';
