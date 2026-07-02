@@ -16,10 +16,12 @@
     <outline text="Companies">
       <outline text="Socket" type="rss" xmlUrl="https://socket.dev/api/blog/feed.atom" htmlUrl="https://socket.dev/api/blog/feed.json" description="Socket fights vulnerabilities and provides visibility, defense-in-depth, and proactive supply chain protection for JavaScript, Python, and Go dependencies."/>
       <outline text="The GitHub Blog" type="rss" xmlUrl="https://github.blog/feed/" htmlUrl="https://github.blog/" description="Updates, ideas, and inspiration from GitHub to help developers build and design software."/>
+      <outline text="VoidZero" type="rss" xmlUrl="https://voidzero.dev/feed.xml" htmlUrl="https://voidzero.dev/"/>
     </outline>
 
     <!-- Blogs of libraries, tools, and other software -->
     <outline text="Software">
+      <outline text="ESLint Blog" type="rss" xmlUrl="https://eslint.org/feed.xml" htmlUrl="https://eslint.org/" description="feed description"/>
       <outline text="HashiCorp Blog - Terraform" type="rss" xmlUrl="https://www.hashicorp.com/blog/products/terraform/feed.xml" htmlUrl="https://hashicorp.com/blog/products/terraform" description="Terraform is a platform for building, changing, and managing infrastructure in a safe, repeatable way."/>
       <outline text="Homebrew" type="rss" xmlUrl="https://brew.sh/atom.xml" htmlUrl="https://brew.sh/" description="The Missing Package Manager for macOS (or Linux)."/>
       <outline text="Node.js Blog" type="rss" xmlUrl="https://nodejs.org/en/feed/blog.xml" htmlUrl="https://nodejs.org/en/feed/blog.xml" description="undefined"/>
@@ -28,6 +30,7 @@
       <outline text="Tailwind CSS Blog" type="rss" xmlUrl="https://tailwindcss.com/feeds/feed.xml" htmlUrl="https://tailwindcss.com/blog" description="All the latest Tailwind CSS news, straight from the team."/>
       <outline text="TanStack Blog" type="rss" xmlUrl="https://tanstack.com/rss.xml" htmlUrl="https://tanstack.com/blog" description="The latest news and updates from TanStack"/>
       <outline text="TypeScript" type="rss" xmlUrl="https://devblogs.microsoft.com/typescript/feed/" htmlUrl="https://devblogs.microsoft.com/typescript/" description="The official blog of the TypeScript team."/>
+      <outline text="Vite" type="rss" xmlUrl="https://vite.dev/blog.rss" htmlUrl="https://vite.dev/blog" description="Next Generation Frontend Tooling"/>
       <outline text="web.dev: Blog" type="rss" xmlUrl="https://web.dev/static/blog/feed.xml" htmlUrl="https://web.dev/blog/" description="All of web.dev's blog posts."/>
     </outline>
 
