@@ -54,6 +54,11 @@ session:
       domain: '{{ env "SERVER_DOMAIN" }}'
       authelia_url: 'https://auth.{{ env "SERVER_DOMAIN" }}'
       same_site: lax
+  redis:
+    host: "redis"
+    port: 6379
+    username: "jeremy"
+    password: '{{ secret "/run/secrets/authelia-redis-password" }}'
 
 # Regulation Configuration
 regulation:

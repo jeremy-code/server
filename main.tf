@@ -79,7 +79,7 @@ resource "oci_vault_secret" "authelia_oidc_signing_key" {
 }
 
 locals {
-  authelia_secrets = ["hmac_secret", "jwt_secret", "session_secret", "storage_encryption_key"]
+  authelia_secrets = ["hmac_secret", "jwt_secret", "session_secret", "storage_encryption_key", "redis_password"]
 }
 
 resource "oci_vault_secret" "authelia" {
@@ -373,6 +373,10 @@ locals {
           content = local.authelia.storage_encryption_key
         },
         {
+          path    = "/home/jeremy/authelia-redis-password",
+          content = local.authelia.redis_password
+        },
+        {
           path    = "/home/jeremy/htpasswd",
           content = "${var.rclone_config.username}:${bcrypt(var.rclone_config.password)}",
           # https://github.com/rclone/rclone/blob/master/Dockerfile#L48
@@ -424,6 +428,18 @@ locals {
               email_address = var.user_config.email_address
               password      = bcrypt(var.user_config.password, 12)
             }
+          }))
+        },
+        {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/redis.conf",
+          content  = base64gzip(file("${path.module}/files/redis.conf"))
+        },
+        {
+          encoding = "gzip+base64"
+          path     = "/home/jeremy/redis.users.acl",
+          content = base64gzip(templatefile("${path.module}/templates/redis.users.acl.tftpl", {
+            password = sha256(local.authelia.redis_password)
           }))
         },
         {
